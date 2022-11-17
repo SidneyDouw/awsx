@@ -1,0 +1,23 @@
+var_a = "abc"
+var_b = "def"
+var_c = "ghi"
+
+[env]
+AWS_PROFILE = "default"
+AWS_DEFAULT_REGION = "eu-central-1"
+
+[sub]
+var_a = "xyz"
+
+[sub.a]
+var_b = "uvw"
+
+[sub.b]
+var_c = "rst"
+
+# not yet tested / implemented
+# [[array]]
+# a = "xyz"
+
+# [[array]]
+# b = "uvw"

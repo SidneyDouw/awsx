@@ -1,0 +1,8 @@
+var_a = "cba"
+
+[env]
+AWS_PROFILE = "edited"
+AWS_DEFAULT_REGION = "eu-central-1"
+
+[sub.b]
+var_c = "sph"

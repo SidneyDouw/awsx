@@ -1,0 +1,13 @@
+[parameters]
+Test1 = "test_1"
+Test2 = "test_2"
+Test3 = '{{ echo "test_3" }}'
+Test4 = '{{ echo $TEST_VAR }}'
+# TODO: only expose parameters that are explicitly marked
+# Test5 = { value = "test_5", expose_as = "TEST_5" }
+
+[env]
+AWS_PROFILE = "default"
+AWS_DEFAULT_REGION = "eu-central-1"
+
+TEST_VAR = "test_4"

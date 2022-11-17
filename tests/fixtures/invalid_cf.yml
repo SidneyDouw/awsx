@@ -1,0 +1,7 @@
+Parameters:
+  Test1:
+    Type: String
+  Test2:
+    Type: String
+  Test3:
+    Type: String

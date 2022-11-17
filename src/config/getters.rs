@@ -1,0 +1,319 @@
+use super::{Config, OVERRIDE_FILEPATH};
+use std::path::{Path, PathBuf};
+use toml::{
+    value::{Datetime, Map},
+    Value,
+};
+
+// Getters
+impl Config {
+    pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
+        self.sorted_filepaths()
+            .into_iter()
+            .find_map(|filepath| self.get_from_file(&key, filepath))
+    }
+
+    pub fn get_with_filepath(&self, key: impl AsRef<str>) -> Option<(&Value, PathBuf)> {
+        self.sorted_filepaths()
+            .into_iter()
+            .find_map(|filepath| self.get_from_file(&key, &filepath).map(|v| (v, filepath)))
+    }
+
+    pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
+        for filepath in self.sorted_filepaths() {
+            match self.get_from_file_mut(&key, &filepath) {
+                Some(_) => return self.get_from_file_mut(key.as_ref(), &filepath),
+                None => continue,
+            }
+        }
+        None
+    }
+
+    pub fn get_mut_with_filepath(&mut self, key: impl AsRef<str>) -> Option<(&mut Value, PathBuf)> {
+        for filepath in self.sorted_filepaths() {
+            match self.get_from_file_mut(&key, &filepath) {
+                Some(_) => {
+                    return self
+                        .get_from_file_mut(key.as_ref(), &filepath)
+                        .map(|x| (x, filepath))
+                }
+                None => continue,
+            }
+        }
+        None
+    }
+
+    pub(crate) fn get_merged_tables(&self, key: impl AsRef<str>) -> Map<String, Value> {
+        self.sorted_filepaths()
+            .into_iter()
+            .rev()
+            .map(|filepath| {
+                self.get_from_file(&key, filepath)
+                    .map(|v| {
+                        v.as_table()
+                            .unwrap_or_else(|| panic!("key {} should be a table", key.as_ref()))
+                            .to_owned()
+                    })
+                    .unwrap_or_default()
+            })
+            .reduce(|mut accum, item| {
+                item.into_iter().for_each(|(k, v)| {
+                    accum.insert(k, v);
+                });
+                accum
+            })
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn get_from_file(
+        &self,
+        key: impl AsRef<str>,
+        filepath: impl AsRef<Path>,
+    ) -> Option<&Value> {
+        let (key, sub_keys) = Self::split_key_once(key.as_ref());
+        let filepath = if filepath.as_ref().to_string_lossy() == OVERRIDE_FILEPATH {
+            filepath.as_ref().to_owned()
+        } else {
+            filepath.as_ref().canonicalize().ok()?
+        };
+        let val = self.file_map.get(&filepath)?.get(key)?;
+        match (sub_keys.is_empty(), val) {
+            (false, Value::Table(t)) => Self::get_from_table(t, sub_keys),
+            (true, _) => Some(val),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn get_from_table(
+        table: &Map<String, Value>,
+        key: impl AsRef<str>,
+    ) -> Option<&Value> {
+        let (key, sub_keys) = Self::split_key_once(key.as_ref());
+        let val = table.get(key)?;
+        match (sub_keys.is_empty(), val) {
+            (false, Value::Table(t)) => Self::get_from_table(t, sub_keys),
+            (true, _) => Some(val),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn get_from_file_mut(
+        &mut self,
+        key: impl AsRef<str>,
+        filepath: impl AsRef<Path>,
+    ) -> Option<&mut Value> {
+        let (key, sub_keys) = Self::split_key_once(key.as_ref());
+        let filepath = if filepath.as_ref().to_string_lossy() == OVERRIDE_FILEPATH {
+            filepath.as_ref().to_owned()
+        } else {
+            filepath.as_ref().canonicalize().ok()?
+        };
+        let val = self.file_map.get_mut(&filepath)?.get_mut(key)?;
+        if sub_keys.is_empty() {
+            Some(val)
+        } else {
+            match val {
+                Value::Table(t) => Self::get_from_table_mut(t, sub_keys),
+                _ => None,
+            }
+        }
+    }
+
+    pub(crate) fn get_from_table_mut(
+        table: &mut Map<String, Value>,
+        key: impl AsRef<str>,
+    ) -> Option<&mut Value> {
+        let (key, sub_keys) = Self::split_key_once(key.as_ref());
+        let val = table.get_mut(key)?;
+        if sub_keys.is_empty() {
+            Some(val)
+        } else {
+            match val {
+                Value::Table(t) => Self::get_from_table_mut(t, sub_keys),
+                _ => None,
+            }
+        }
+    }
+
+    pub(crate) fn get_root_table_mut(
+        &mut self,
+        filepath: impl AsRef<Path>,
+    ) -> &mut Map<String, Value> {
+        self.file_map
+            .entry(filepath.as_ref().to_owned())
+            .or_insert_with(|| Value::Table(Map::new()))
+            .as_table_mut()
+            .expect("there should always be a 'table' at the root")
+    }
+
+    pub(crate) fn split_key_once(key: &str) -> (&str, &str) {
+        match key.split_once('.') {
+            Some((key, sub_keys)) => (key, sub_keys),
+            None => (key, ""),
+        }
+    }
+
+    pub(crate) fn sorted_filepaths(&self) -> Vec<PathBuf> {
+        let mut filepaths = self
+            .file_map
+            .keys()
+            .map(ToOwned::to_owned)
+            .filter(|e| e.to_string_lossy() != OVERRIDE_FILEPATH)
+            .collect::<Vec<_>>();
+
+        filepaths.sort_by(|a, b| b.partial_cmp(a).unwrap());
+        filepaths.insert(0, PathBuf::from(OVERRIDE_FILEPATH));
+
+        filepaths
+    }
+}
+
+/// Specific getters
+#[cfg(not(tarpaulin_include))]
+impl Config {
+    pub fn get_string(&self, key: impl AsRef<str>) -> Option<&String> {
+        match self.get(key) {
+            Some(Value::String(v)) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn get_int(&self, key: impl AsRef<str>) -> Option<&i64> {
+        match self.get(key) {
+            Some(Value::Integer(v)) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn get_float(&self, key: impl AsRef<str>) -> Option<&f64> {
+        match self.get(key) {
+            Some(Value::Float(v)) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn get_bool(&self, key: impl AsRef<str>) -> Option<&bool> {
+        match self.get(key) {
+            Some(Value::Boolean(v)) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn get_datetime(&self, key: impl AsRef<str>) -> Option<&Datetime> {
+        match self.get(key) {
+            Some(Value::Datetime(v)) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn get_array(&self, key: impl AsRef<str>) -> Option<&Vec<Value>> {
+        match self.get(key) {
+            Some(Value::Array(v)) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn get_table(&self, key: impl AsRef<str>) -> Option<&Map<String, Value>> {
+        match self.get(key) {
+            Some(Value::Table(v)) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn get_string_mut(&mut self, key: impl AsRef<str>) -> Option<&mut String> {
+        match self.get_mut(key) {
+            Some(Value::String(v)) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn get_int_mut(&mut self, key: impl AsRef<str>) -> Option<&mut i64> {
+        match self.get_mut(key) {
+            Some(Value::Integer(v)) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn get_float_mut(&mut self, key: impl AsRef<str>) -> Option<&mut f64> {
+        match self.get_mut(key) {
+            Some(Value::Float(v)) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn get_bool_mut(&mut self, key: impl AsRef<str>) -> Option<&mut bool> {
+        match self.get_mut(key) {
+            Some(Value::Boolean(v)) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn get_datetime_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Datetime> {
+        match self.get_mut(key) {
+            Some(Value::Datetime(v)) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn get_array_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Vec<Value>> {
+        match self.get_mut(key) {
+            Some(Value::Array(v)) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn get_table_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Map<String, Value>> {
+        match self.get_mut(key) {
+            Some(Value::Table(v)) => Some(v),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_get_from_file() {
+        let path = PathBuf::from("tests/fixtures/nested_configs/config.toml");
+        let config = Config::from_path(&path, Default::default()).unwrap();
+
+        let v = config.get_from_file("non_existent", &path);
+        assert_eq!(v, None);
+
+        let v = config.get_from_file("var_a", &path.join("invalid"));
+        assert_eq!(v, None);
+
+        let v = config
+            .get_from_file("var_a", &path)
+            .unwrap()
+            .as_str()
+            .unwrap();
+        assert_eq!(v, "abc");
+
+        let v = config.get_from_file("env", &path).unwrap();
+        assert!(matches!(v, toml::Value::Table(_)));
+
+        let v = config
+            .get_from_file("env.AWS_PROFILE", &path)
+            .unwrap()
+            .as_str()
+            .unwrap();
+        assert_eq!(v, "default");
+
+        let v = config.get_from_file("sub.a", &path).unwrap();
+        assert!(matches!(v, toml::Value::Table(_)));
+
+        let v = config.get_from_file("sub.a.", &path).unwrap();
+        assert!(matches!(v, toml::Value::Table(_)));
+
+        let v = config
+            .get_from_file("sub.b.var_c", &path)
+            .unwrap()
+            .as_str()
+            .unwrap();
+        assert_eq!(v, "rst");
+    }
+}

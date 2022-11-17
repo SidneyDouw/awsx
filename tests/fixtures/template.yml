@@ -1,0 +1,14 @@
+Parameters:
+  Test1:
+    Type: String
+  Test2:
+    Type: String
+  Test3:
+    Type: String
+
+Resources:
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0caef02b518350c8b # Ubuntu Server 20.04
+      InstanceType: t2.nano

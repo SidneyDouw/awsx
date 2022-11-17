@@ -1,0 +1,12 @@
+[package]
+name = "awsx"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.66"
+clap = {version = "4.0.18", features = ["derive"]}
+duct = "0.13.5"
+thiserror = "1.0.37"
+toml = "0.5.9"
+yaml-rust = "0.4.5"
