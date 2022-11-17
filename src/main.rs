@@ -3,7 +3,7 @@ use clap::Parser;
 use std::path::PathBuf;
 
 #[derive(Debug, clap::Parser)]
-#[clap(name = "awsx", about = "Wrapper around the AWS CLI")]
+#[clap(name = "awsx", about = "Opinionated wrapper around the AWS CLI")]
 pub struct Args {
     /// Path to 'config.toml' file. Will scan every file with the same name up to the project root.
     #[clap(long, short = 'c')]
