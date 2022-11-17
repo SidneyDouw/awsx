@@ -14,10 +14,7 @@ fn get_project_root_automatically() {
 
     let r = options.get_project_root();
     match r {
-        Ok(path) => assert_eq!(
-            path,
-            root_dir.join("..").canonicalize().expect("valid path")
-        ),
+        Ok(path) => assert_eq!(path, root_dir.canonicalize().expect("valid path")),
         Err(_) => unreachable!(),
     }
 }
