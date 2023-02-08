@@ -11,6 +11,7 @@ pub fn create_instance(options: CreateInstanceOptions, config: &Config) -> Resul
         keypair,
         image_id,
         instance_type,
+        volume_type,
         volume_size,
         security_group_id: security_group_id_vec,
         security_group_ids,
@@ -24,7 +25,7 @@ pub fn create_instance(options: CreateInstanceOptions, config: &Config) -> Resul
     keypair.map(|keypair| cmd_str.push_str(&format!("--key-name {} ", keypair)));
     cmd_str.push_str(&format!("--image-id {} ", image_id));
     cmd_str.push_str(&format!("--instance-type {} ", instance_type));
-    cmd_str.push_str(&format!("--block-device-mappings \"DeviceName=/dev/sda1, Ebs={{VolumeType=gp3, VolumeSize={}, Iops=1000, DeleteOnTermination=true }}\" ", volume_size));
+    cmd_str.push_str(&format!("--block-device-mappings \"DeviceName=/dev/sda1, Ebs={{VolumeType={}, VolumeSize={}, Iops=1000, DeleteOnTermination=true }}\" ", volume_type, volume_size));
     cmd_str.push_str(&format!("--associate-public-ip-address "));
 
     if let Some(security_group_ids) = security_group_ids {

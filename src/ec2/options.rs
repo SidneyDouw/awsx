@@ -54,6 +54,10 @@ pub struct CreateInstanceOptions {
     pub instance_type: String,
 
     /// todo
+    #[clap(long, default_value = "gp3")]
+    pub volume_type: String,
+
+    /// todo
     #[clap(long, default_value = "32")]
     pub volume_size: u8,
 
@@ -76,4 +80,14 @@ pub struct CreateInstanceOptions {
     /// IAM instance profile name
     #[clap(long)]
     pub instance_profile: Option<String>,
+}
+
+pub enum VolumeType {
+    Gp2,
+    Gp3,
+    Io1,
+    Io2,
+    Sc1,
+    St1,
+    Standard,
 }
