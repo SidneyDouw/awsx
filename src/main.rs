@@ -28,6 +28,9 @@ pub enum Subcommands {
 
     #[clap(subcommand)]
     Ec2(awsx::ec2::Subcommands),
+
+    #[clap(subcommand)]
+    Bucket(awsx::bucket::Subcommands),
 }
 
 #[cfg(not(tarpaulin_include))]
@@ -65,6 +68,11 @@ fn main() -> anyhow::Result<()> {
             } => awsx::ec2::create_image(name, instance_id, description, &config),
             awsx::ec2::Subcommands::GetLatestAMI { filter, with_name } => {
                 awsx::ec2::get_latest_ami(filter, with_name, &config)
+            }
+        },
+        Subcommands::Bucket(cmd) => match cmd {
+            awsx::bucket::Subcommands::Exists { bucket_name } => {
+                awsx::bucket::bucket_exists(&bucket_name, &config)
             }
         },
     }?;
