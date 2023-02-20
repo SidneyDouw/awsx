@@ -4,7 +4,7 @@ use crate::{
     config::Config,
 };
 use anyhow::Result;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub fn create(
     stack_name: impl AsRef<str>,
@@ -94,10 +94,10 @@ pub fn output(
     }
 }
 
-pub fn validate(template: PathBuf, config: &Config) -> Result<()> {
+pub fn validate(template: impl AsRef<Path>, config: &Config) -> Result<()> {
     let cmd = format!(
         "aws cloudformation validate-template --template-body file://{}",
-        template.to_string_lossy()
+        template.as_ref().to_string_lossy()
     );
 
     run(&cmd, config)?;

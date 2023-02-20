@@ -1,4 +1,4 @@
-/// Commands that control Cloud Formation related tasks
+/// Commands that control EC2 related tasks
 #[derive(Debug, clap::Subcommand)]
 pub enum Subcommands {
     /// Creates an EC2 instance
