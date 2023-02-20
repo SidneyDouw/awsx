@@ -1,5 +1,9 @@
 use super::{Config, OVERRIDE_FILEPATH};
-use std::path::{Path, PathBuf};
+use convert_case::{Case, Casing};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 use toml::{
     value::{Datetime, Map},
     Value,
@@ -41,6 +45,30 @@ impl Config {
             }
         }
         None
+    }
+
+    pub fn get_envs_from_tables(&self) -> HashMap<String, String> {
+        let mut envs: HashMap<String, String> = std::env::vars().collect();
+        envs.extend(self.get_table_from_config("env"));
+        envs.extend(
+            self.get_table_from_config("parameters")
+                .into_iter()
+                .map(|(k, v)| (format!("AWSX_PARAMETER_{}", k.to_case(Case::UpperSnake)), v)),
+        );
+        envs
+    }
+
+    pub(crate) fn get_table_from_config(&self, key: impl AsRef<str>) -> HashMap<String, String> {
+        self.get_merged_tables(&key)
+            .into_iter()
+            .map(|(k, v)| {
+                let v = match v {
+                    toml::Value::String(s) => s,
+                    _ => v.to_string(),
+                };
+                (k, v)
+            })
+            .collect()
     }
 
     pub(crate) fn get_merged_tables(&self, key: impl AsRef<str>) -> Map<String, Value> {

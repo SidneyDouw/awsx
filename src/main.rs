@@ -23,6 +23,17 @@ pub struct Args {
 
 #[derive(Debug, clap::Subcommand)]
 pub enum Subcommands {
+    /// Replace all occurences of existing environment variables in a file.
+    /// By default the result will be printed to stdout.
+    Substitute {
+        /// Path to file in which all occurences of existing env vars will be replaced.
+        file: PathBuf,
+
+        /// Optionally write the output to a file instead of printing to stdout.
+        #[clap(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
+
     #[clap(subcommand)]
     Stack(awsx::stack::Subcommands),
 
@@ -40,6 +51,10 @@ fn main() -> anyhow::Result<()> {
     let mut config = Config::from_path(args.config, Default::default())?;
 
     match args.cmd {
+        Subcommands::Substitute { file, output } => {
+            awsx::substitute::substitute_env_vars(file, output, &config)
+        }
+
         Subcommands::Stack(cmd) => match cmd {
             awsx::stack::Subcommands::Create {
                 stack_name,
@@ -70,6 +85,7 @@ fn main() -> anyhow::Result<()> {
                 awsx::ec2::get_latest_ami(filter, with_name, &config)
             }
         },
+
         Subcommands::Bucket(cmd) => match cmd {
             awsx::bucket::Subcommands::Exists { bucket_name } => {
                 awsx::bucket::bucket_exists(&bucket_name, &config)

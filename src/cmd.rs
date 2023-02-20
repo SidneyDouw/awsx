@@ -46,35 +46,13 @@ fn expression(cmd: &str, config: &Config) -> Result<duct::Expression, Error> {
 }
 
 fn setup(config: &Config) -> Result<HashMap<String, String>, Error> {
-    let mut envs: HashMap<String, String> = std::env::vars().collect();
-    envs.extend(get_table_from_config("env", config));
-    envs.extend(
-        get_table_from_config("parameters", config)
-            .into_iter()
-            .map(|(k, v)| (format!("AWSX_PARAMETERS_{}", k), v)),
-    );
+    let mut envs = config.get_envs_from_tables();
 
     ensure_env_var(&envs, "AWS_PROFILE")?;
     ensure_env_var(&envs, "AWS_DEFAULT_REGION")?;
     ensure_env_var_or_default(&mut envs, "AWS_PAGER", "");
 
-    // println!("{:?}", envs);
-
     Ok(envs)
-}
-
-fn get_table_from_config(key: impl AsRef<str>, config: &Config) -> HashMap<String, String> {
-    config
-        .get_merged_tables(&key)
-        .into_iter()
-        .map(|(k, v)| {
-            let v = match v {
-                toml::Value::String(s) => s,
-                _ => v.to_string(),
-            };
-            (k, v)
-        })
-        .collect()
 }
 
 fn ensure_env_var(envs: &HashMap<String, String>, key: impl AsRef<str>) -> Result<(), Error> {
