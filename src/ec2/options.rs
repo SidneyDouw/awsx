@@ -8,6 +8,18 @@ pub enum Subcommands {
         options: CreateInstanceOptions,
     },
 
+    /// Starts an EC2 instance
+    StartInstance {
+        /// todo
+        instance_id: String,
+    },
+
+    /// Stops an EC2 instance
+    StopInstance {
+        /// todo
+        instance_id: String,
+    },
+
     /// Creates an Aamazon Machine Image from a running instance
     CreateImage {
         /// The intended name for the AMI

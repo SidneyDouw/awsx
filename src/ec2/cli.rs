@@ -102,6 +102,54 @@ pub fn create_image(
     Ok(())
 }
 
+pub fn start_instance(instance_id: String, config: &Config) -> Result<(), anyhow::Error> {
+    let instance_details = read(
+        &format!("aws ec2 start-instances --instance-ids {}", instance_id),
+        config,
+    )?;
+
+    println!("{}", instance_details);
+
+    println!("Starting instance {:?}", instance_id);
+    println!("Waiting until running...");
+
+    run(
+        &format!(
+            "aws ec2 wait instance-running --instance-ids {}",
+            instance_id
+        ),
+        config,
+    )?;
+
+    println!("Done");
+
+    Ok(())
+}
+
+pub fn stop_instance(instance_id: String, config: &Config) -> Result<(), anyhow::Error> {
+    let instance_details = read(
+        &format!("aws ec2 stop-instances --instance-ids {}", instance_id),
+        config,
+    )?;
+
+    println!("{}", instance_details);
+
+    println!("Stopping instance {:?}", instance_id);
+    println!("Waiting until stopped...");
+
+    run(
+        &format!(
+            "aws ec2 wait instance-stopped --instance-ids {}",
+            instance_id
+        ),
+        config,
+    )?;
+
+    println!("Done");
+
+    Ok(())
+}
+
 pub fn get_latest_ami(filter: Option<String>, with_name: bool, config: &Config) -> Result<()> {
     let cmd = format!("aws ec2 describe-images --owners self --query \"Images[].[CreationDate, Name, ImageId] | sort_by(@, &[0])\" --output text");
     let out = read(&cmd, config)?;
