@@ -1,4 +1,5 @@
 use super::{Config, OVERRIDE_FILEPATH};
+use crate::cmd::read_with_env;
 use convert_case::{Case, Casing};
 use std::{
     collections::HashMap,
@@ -55,7 +56,19 @@ impl Config {
                 .into_iter()
                 .map(|(k, v)| (format!("AWSX_PARAMETER_{}", k.to_case(Case::UpperSnake)), v)),
         );
+        self.resolve_expression_values(&mut envs);
         envs
+    }
+
+    fn resolve_expression_values(&self, envs: &mut HashMap<String, String>) {
+        for (key, val) in envs.clone().into_iter() {
+            if val.starts_with("{{") && val.ends_with("}}") {
+                let exp = val[2..val.len() - 2].trim();
+                // TODO: use `read_with_parent` for when expression uses relative paths
+                let val = read_with_env(exp, envs, self).expect("valid expression");
+                envs.entry(key).and_modify(|e| *e = val);
+            }
+        }
     }
 
     pub(crate) fn get_table_from_config(&self, key: impl AsRef<str>) -> HashMap<String, String> {

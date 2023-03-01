@@ -22,6 +22,16 @@ pub fn read(cmd: &str, config: &Config) -> Result<String, Error> {
     expression(cmd, config)?.read().map_err(Error::IO)
 }
 
+pub fn read_with_env(
+    cmd: &str,
+    env: &HashMap<String, String>,
+    config: &Config,
+) -> Result<String, Error> {
+    expression_with_env(cmd, env, config)?
+        .read()
+        .map_err(Error::IO)
+}
+
 pub fn read_with_dir(
     cmd: &str,
     config: &Config,
@@ -34,7 +44,16 @@ pub fn read_with_dir(
 }
 
 fn expression(cmd: &str, config: &Config) -> Result<duct::Expression, Error> {
-    let mut exp = cmd!("bash", "-c", cmd).full_env(setup(config)?);
+    let env = setup(config)?;
+    expression_with_env(cmd, &env, config)
+}
+
+fn expression_with_env(
+    cmd: &str,
+    env: &HashMap<String, String>,
+    config: &Config,
+) -> Result<duct::Expression, Error> {
+    let mut exp = cmd!("bash", "-c", cmd).full_env(env);
 
     if let Some(b) = config.get_bool("cmd.silent") {
         if *b {
