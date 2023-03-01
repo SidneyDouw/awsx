@@ -42,6 +42,9 @@ pub enum Subcommands {
 
     #[clap(subcommand)]
     Bucket(awsx::bucket::Subcommands),
+
+    #[clap(subcommand)]
+    Lambda(awsx::lambda::Subcommands),
 }
 
 #[cfg(not(tarpaulin_include))]
@@ -99,6 +102,13 @@ fn main() -> anyhow::Result<()> {
             awsx::bucket::Subcommands::Exists { bucket_name } => {
                 awsx::bucket::bucket_exists(&bucket_name, &config)
             }
+        },
+
+        Subcommands::Lambda(cmd) => match cmd {
+            awsx::lambda::Subcommands::UpdateFunction {
+                function_name,
+                zip_file,
+            } => awsx::lambda::update_function(function_name, zip_file, &config),
         },
     }?;
 
