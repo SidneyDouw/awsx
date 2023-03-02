@@ -12,7 +12,7 @@ pub enum Error {
 }
 
 pub fn run(cmd: &str, config: &Config) -> Result<(), Error> {
-    let env = setup(config)?;
+    let env = get_envs_from_config(config)?;
     expression(cmd, &env, config)
         .run()
         .map(|_| ())
@@ -20,9 +20,31 @@ pub fn run(cmd: &str, config: &Config) -> Result<(), Error> {
 }
 
 pub fn read(cmd: &str, config: &Config) -> Result<String, Error> {
-    let env = setup(config)?;
-    expression(cmd, &env, config).read().map_err(Error::IO)
+    let env = get_envs_from_config(config)?;
+    read_with_env(cmd, &env, config)
 }
+
+// TODO: refactor
+// pub fn read2(
+//     cmd: &str,
+//     env: Option<&HashMap<String, String>>,
+//     workdir: Option<&impl AsRef<Path>>,
+//     config: &Config,
+// ) -> Result<String, Error> {
+//     let env = if let Some(env) = env {
+//         env
+//     } else {
+//         &get_envs_from_config(config)?
+//     };
+
+//     let mut exp = expression(cmd, env, config);
+
+//     if let Some(dir) = workdir {
+//         exp = exp.dir(workdir.as_ref().into())
+//     }
+
+//     exp.read().map_err(Error::IO)
+// }
 
 pub fn read_with_env(
     cmd: &str,
@@ -32,6 +54,18 @@ pub fn read_with_env(
     expression(cmd, env, config).read().map_err(Error::IO)
 }
 
+pub fn read_with_dir(
+    cmd: &str,
+    workdir: impl AsRef<Path>,
+    config: &Config,
+) -> Result<String, Error> {
+    let env = get_envs_from_config(config)?;
+    expression(cmd, &env, config)
+        .dir(workdir.as_ref())
+        .read()
+        .map_err(Error::IO)
+}
+
 pub fn read_with_dir_and_env(
     cmd: &str,
     workdir: impl AsRef<Path>,
@@ -39,18 +73,6 @@ pub fn read_with_dir_and_env(
     config: &Config,
 ) -> Result<String, Error> {
     expression(cmd, env, config)
-        .dir(workdir.as_ref())
-        .read()
-        .map_err(Error::IO)
-}
-
-pub fn read_with_dir(
-    cmd: &str,
-    workdir: impl AsRef<Path>,
-    config: &Config,
-) -> Result<String, Error> {
-    let env = setup(config)?;
-    expression(cmd, &env, config)
         .dir(workdir.as_ref())
         .read()
         .map_err(Error::IO)
@@ -70,7 +92,7 @@ fn expression(cmd: &str, env: &HashMap<String, String>, config: &Config) -> duct
     exp
 }
 
-fn setup(config: &Config) -> Result<HashMap<String, String>, Error> {
+fn get_envs_from_config(config: &Config) -> Result<HashMap<String, String>, Error> {
     let mut envs = config.get_envs_from_tables();
 
     ensure_env_var(&envs, "AWS_PROFILE")?;

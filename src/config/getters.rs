@@ -1,6 +1,7 @@
 use super::{Config, OVERRIDE_FILEPATH};
-use crate::cmd::read_with_env;
+use crate::cmd::read_with_dir_and_env;
 use convert_case::{Case, Casing};
+use core::panic;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -49,53 +50,85 @@ impl Config {
     }
 
     pub fn get_envs_from_tables(&self) -> HashMap<String, String> {
-        let mut envs: HashMap<String, String> = std::env::vars().collect();
-        envs.extend(self.get_table_from_config("env"));
+        // let mut envs = std::env::vars()
+        //     .into_iter()
+        //     .map(|(k, v)| (k, (v, PathBuf::new())))
+        //     .collect::<HashMap<_, _>>();
+
+        let mut envs = HashMap::new();
+
         envs.extend(
-            self.get_table_from_config("parameters")
+            self.get_merged_tables("env")
                 .into_iter()
-                .map(|(k, v)| (format!("AWSX_PARAMETER_{}", k.to_case(Case::UpperSnake)), v)),
+                .map(|(k, (v, p))| match v {
+                    Value::String(s) => (k, (s, p)),
+                    x => panic!("value for {k} is not a string, found {:?}", x),
+                }),
         );
+
+        envs.extend(
+            self.get_merged_tables("parameters")
+                .into_iter()
+                .filter_map(|(k, (v, p))| match v {
+                    Value::Table(t) => match (t.get("value"), t.get("expose")) {
+                        (Some(Value::String(s)), Some(Value::Boolean(e))) if e == &true => Some((
+                            format!("AWSX_PARAMETER_{}", k.to_case(Case::UpperSnake)),
+                            (s.to_owned(), p),
+                        )),
+                        _ => None,
+                    },
+                    _ => None,
+                }),
+        );
+
         self.resolve_expression_values(&mut envs);
-        envs
+
+        envs.into_iter().map(|(k, (v, _))| (k, v)).collect()
     }
 
-    fn resolve_expression_values(&self, envs: &mut HashMap<String, String>) {
-        for (key, val) in envs.clone().into_iter() {
+    fn resolve_expression_values(&self, envs: &mut HashMap<String, (String, PathBuf)>) {
+        let cleaned_envs = envs
+            .clone()
+            .into_iter()
+            .map(|(k, (v, _))| (k, v))
+            .collect::<HashMap<_, _>>();
+
+        for (key, (val, config_path)) in envs.clone().into_iter() {
             if val.starts_with("{{") && val.ends_with("}}") {
                 let exp = val[2..val.len() - 2].trim();
-                // TODO: use `read_with_parent` for when expression uses relative paths
-                let val = read_with_env(exp, envs, self).expect("valid expression");
-                envs.entry(key).and_modify(|e| *e = val);
+                let workdir = config_path.parent().expect("has parent");
+
+                let val = read_with_dir_and_env(exp, workdir, &cleaned_envs, self)
+                    .expect("valid expression");
+                envs.entry(key).and_modify(|(v, _)| *v = val);
             }
         }
     }
 
-    pub(crate) fn get_table_from_config(&self, key: impl AsRef<str>) -> HashMap<String, String> {
-        self.get_merged_tables(&key)
-            .into_iter()
-            .map(|(k, v)| {
-                let v = match v {
-                    toml::Value::String(s) => s,
-                    _ => v.to_string(),
-                };
-                (k, v)
-            })
-            .collect()
-    }
-
-    pub(crate) fn get_merged_tables(&self, key: impl AsRef<str>) -> Map<String, Value> {
+    pub(crate) fn get_merged_tables(
+        &self,
+        key: impl AsRef<str>,
+    ) -> HashMap<String, (Value, PathBuf)> {
         self.sorted_filepaths()
             .into_iter()
             .rev()
             .map(|filepath| {
-                self.get_from_file(&key, filepath)
+                self.get_from_file(&key, &filepath)
                     .map(|v| {
-                        v.as_table()
-                            .unwrap_or_else(|| panic!("key {} should be a table", key.as_ref()))
-                            .to_owned()
+                        (
+                            v.as_table()
+                                .unwrap_or_else(|| panic!("key {} should be a table", key.as_ref()))
+                                .to_owned(),
+                            filepath,
+                        )
                     })
                     .unwrap_or_default()
+            })
+            .map(|(table, filepath)| {
+                table
+                    .into_iter()
+                    .map(|(key, val)| (key, (val, filepath.clone())))
+                    .collect::<HashMap<_, _>>()
             })
             .reduce(|mut accum, item| {
                 item.into_iter().for_each(|(k, v)| {
