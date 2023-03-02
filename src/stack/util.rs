@@ -25,11 +25,13 @@ pub enum Error {
 pub fn parameters_to_string(parameters: Vec<(String, Value)>) -> String {
     [String::from("--parameters")]
         .into_iter()
-        .chain(
-            parameters
-                .into_iter()
-                .map(|(k, v)| format!("ParameterKey={},ParameterValue={}", k, v)),
-        )
+        .chain(parameters.into_iter().map(|(k, v)| match v {
+            Value::Table(t) => match t.get("value") {
+                Some(v) => format!("ParameterKey={},ParameterValue={}", k, v),
+                None => panic!("missing 'value' key in table: {k} - {:?}", t),
+            },
+            _ => format!("ParameterKey={},ParameterValue={}", k, v),
+        }))
         .collect::<Vec<String>>()
         .join(" ")
 }
@@ -47,25 +49,22 @@ pub fn get_parameter_values_from_config(
                 .map(|(val, filepath)| (key.clone(), val.clone(), filepath))
                 .ok_or(Error::MissingParameter { key })
         })
-        // .map(|r| r.map(|(key, val, _filepath)| (key, val)))
         .flat_map(|r| {
-            r.map({
-                |(key, val, filepath)| {
-                    if let Some(s) = val.as_str() {
-                        if s.starts_with("{{") && s.ends_with("}}") {
-                            let exp = s[2..s.len() - 2].trim();
-                            return read_with_dir(
-                                exp,
-                                filepath.parent().expect("has a parent"),
-                                config,
-                            )
-                            .map(|val| (key, Value::String(val)))
-                            .map_err(Error::Cmd);
-                        }
+            r.map(|(key, val, filepath)| {
+                if let Some(s) = val.as_str() {
+                    if s.starts_with("{{") && s.ends_with("}}") {
+                        let exp = s[2..s.len() - 2].trim();
+                        return read_with_dir(
+                            exp,
+                            filepath.parent().expect("has a parent"),
+                            config,
+                        )
+                        .map(|val| (key, Value::String(val)))
+                        .map_err(Error::Cmd);
                     }
-
-                    Ok((key, val))
                 }
+
+                Ok((key, val))
             })
         })
         .collect::<Result<Vec<_>, Error>>()
