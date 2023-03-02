@@ -12,14 +12,16 @@ pub enum Error {
 }
 
 pub fn run(cmd: &str, config: &Config) -> Result<(), Error> {
-    expression(cmd, config)?
+    let env = setup(config)?;
+    expression(cmd, &env, config)
         .run()
         .map(|_| ())
         .map_err(Error::IO)
 }
 
 pub fn read(cmd: &str, config: &Config) -> Result<String, Error> {
-    expression(cmd, config)?.read().map_err(Error::IO)
+    let env = setup(config)?;
+    expression(cmd, &env, config).read().map_err(Error::IO)
 }
 
 pub fn read_with_env(
@@ -27,32 +29,36 @@ pub fn read_with_env(
     env: &HashMap<String, String>,
     config: &Config,
 ) -> Result<String, Error> {
-    expression_with_env(cmd, env, config)?
+    expression(cmd, env, config).read().map_err(Error::IO)
+}
+
+pub fn read_with_dir_and_env(
+    cmd: &str,
+    workdir: impl AsRef<Path>,
+    env: &HashMap<String, String>,
+    config: &Config,
+) -> Result<String, Error> {
+    expression(cmd, env, config)
+        .dir(workdir.as_ref())
         .read()
         .map_err(Error::IO)
 }
 
 pub fn read_with_dir(
     cmd: &str,
-    config: &Config,
     workdir: impl AsRef<Path>,
+    config: &Config,
 ) -> Result<String, Error> {
-    expression(cmd, config)?
+    let env = setup(config)?;
+    expression(cmd, &env, config)
         .dir(workdir.as_ref())
         .read()
         .map_err(Error::IO)
 }
 
-fn expression(cmd: &str, config: &Config) -> Result<duct::Expression, Error> {
-    let env = setup(config)?;
-    expression_with_env(cmd, &env, config)
-}
-
-fn expression_with_env(
-    cmd: &str,
-    env: &HashMap<String, String>,
-    config: &Config,
-) -> Result<duct::Expression, Error> {
+/// Sets up a duct expression from the given `cmd` parameter, sets its environment from
+/// the given `env` parameter and configures it with settings found in the given `config` parameter
+fn expression(cmd: &str, env: &HashMap<String, String>, config: &Config) -> duct::Expression {
     let mut exp = cmd!("bash", "-c", cmd).full_env(env);
 
     if let Some(b) = config.get_bool("cmd.silent") {
@@ -61,7 +67,7 @@ fn expression_with_env(
         }
     }
 
-    Ok(exp)
+    exp
 }
 
 fn setup(config: &Config) -> Result<HashMap<String, String>, Error> {

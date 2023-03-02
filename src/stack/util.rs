@@ -56,8 +56,8 @@ pub fn get_parameter_values_from_config(
                             let exp = s[2..s.len() - 2].trim();
                             return read_with_dir(
                                 exp,
-                                config,
                                 filepath.parent().expect("has a parent"),
+                                config,
                             )
                             .map(|val| (key, Value::String(val)))
                             .map_err(Error::Cmd);

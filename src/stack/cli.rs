@@ -11,6 +11,8 @@ pub fn create(
     template: impl AsRef<Path>,
     config: &mut Config,
 ) -> Result<()> {
+    // TODO: Can we deduplicate some code here regarding the expression evaluation in the config parameters?
+    // This work is already being done inside the `run` function
     let parameters = parameters_to_string(get_parameter_values_from_config(&template, config)?);
 
     let cmd = format!(

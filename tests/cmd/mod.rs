@@ -35,7 +35,7 @@ fn can_run_cmd_with_workdir() {
     config.set_string("env.AWS_PROFILE", "default");
     config.set_string("env.AWS_DEFAULT_REGION", "eu-central-1");
 
-    let actual = read_with_dir(cmd, &config, workdir).unwrap();
+    let actual = read_with_dir(cmd, workdir, &config).unwrap();
 
     let expected = PathBuf::from(
         std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR should be set"),
