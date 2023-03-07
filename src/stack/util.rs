@@ -51,6 +51,14 @@ pub fn get_parameter_values_from_config(
         })
         .flat_map(|r| {
             r.map(|(key, val, filepath)| {
+                let val = match val {
+                    Value::Table(t) => match t.get("value") {
+                        Some(v) => v.to_owned(),
+                        None => panic!("missing 'value' key in table: {key} - {:?}", t),
+                    },
+                    _ => val,
+                };
+
                 if let Some(s) = val.as_str() {
                     if s.starts_with("{{") && s.ends_with("}}") {
                         let exp = s[2..s.len() - 2].trim();
