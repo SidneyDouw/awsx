@@ -79,15 +79,12 @@ fn main() -> anyhow::Result<()> {
             awsx::ec2::Subcommands::CreateInstance { options } => {
                 awsx::ec2::create_instance(options, &config)
             }
-
             awsx::ec2::Subcommands::StartInstance { instance_id } => {
                 awsx::ec2::start_instance(instance_id, &config)
             }
-
             awsx::ec2::Subcommands::StopInstance { instance_id } => {
                 awsx::ec2::stop_instance(instance_id, &config)
             }
-
             awsx::ec2::Subcommands::CreateImage {
                 name,
                 instance_id,
@@ -102,6 +99,10 @@ fn main() -> anyhow::Result<()> {
             awsx::bucket::Subcommands::Exists { bucket_name } => {
                 awsx::bucket::bucket_exists(&bucket_name, &config)
             }
+            awsx::bucket::Subcommands::PutBucketPolicy {
+                bucket_name,
+                policy,
+            } => awsx::bucket::put_bucket_policy(&bucket_name, &policy, &config),
         },
 
         Subcommands::Lambda(cmd) => match cmd {
