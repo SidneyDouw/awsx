@@ -22,7 +22,7 @@ pub fn bucket_exists(bucket_name: &str, config: &Config) -> Result<()> {
 pub fn put_bucket_policy(bucket_name: &str, policy: &str, config: &Config) -> Result<()> {
     run(
         &format!(
-            "aws s3api put-bucket-policy --bucket {} --policy {}",
+            "aws s3api put-bucket-policy --bucket {} --policy '{}'",
             bucket_name, policy
         ),
         config,
