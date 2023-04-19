@@ -1,10 +1,12 @@
 use crate::config::Config;
 use anyhow::Result;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 pub fn substitute_env_vars(file: PathBuf, _output: Option<PathBuf>, config: &Config) -> Result<()> {
     let mut filestring = std::fs::read_to_string(file)?;
-    let env_vars = config.get_envs_from_tables();
+    let env_vars = std::env::vars()
+        .chain(config.get_envs())
+        .collect::<HashMap<_, _>>();
 
     filestring.clone().rmatch_indices("{{").for_each(|(i, _)| {
         let offset = filestring[i..].find("}}").expect("braces not closed") + 2;
@@ -20,6 +22,15 @@ pub fn substitute_env_vars(file: PathBuf, _output: Option<PathBuf>, config: &Con
     });
 
     println!("{}", filestring);
+
+    Ok(())
+}
+
+pub fn print_env_vars(config: &crate::config::Config) -> Result<()> {
+    config
+        .get_envs()
+        .into_iter()
+        .for_each(|(k, v)| println!("{}\t{}", k, v));
 
     Ok(())
 }

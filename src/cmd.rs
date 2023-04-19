@@ -12,7 +12,7 @@ pub enum Error {
 }
 
 pub fn run(cmd: &str, config: &Config) -> Result<(), Error> {
-    let env = get_envs_from_config(config)?;
+    let env = get_envs_with_config_envs(config)?;
     expression(cmd, &env, config)
         .run()
         .map(|_| ())
@@ -20,7 +20,7 @@ pub fn run(cmd: &str, config: &Config) -> Result<(), Error> {
 }
 
 pub fn read(cmd: &str, config: &Config) -> Result<String, Error> {
-    let env = get_envs_from_config(config)?;
+    let env = get_envs_with_config_envs(config)?;
     read_with_env(cmd, &env, config)
 }
 
@@ -59,7 +59,7 @@ pub fn read_with_dir(
     workdir: impl AsRef<Path>,
     config: &Config,
 ) -> Result<String, Error> {
-    let env = get_envs_from_config(config)?;
+    let env = get_envs_with_config_envs(config)?;
     expression(cmd, &env, config)
         .dir(workdir.as_ref())
         .read()
@@ -92,14 +92,18 @@ fn expression(cmd: &str, env: &HashMap<String, String>, config: &Config) -> duct
     exp
 }
 
-fn get_envs_from_config(config: &Config) -> Result<HashMap<String, String>, Error> {
-    let mut envs = config.get_envs_from_tables();
+fn get_envs_with_config_envs(config: &Config) -> Result<HashMap<String, String>, Error> {
+    let mut config_envs = config.get_envs();
 
-    ensure_env_var(&envs, "AWS_PROFILE")?;
-    ensure_env_var(&envs, "AWS_DEFAULT_REGION")?;
-    ensure_env_var_or_default(&mut envs, "AWS_PAGER", "");
+    ensure_env_var(&config_envs, "AWS_PROFILE")?;
+    ensure_env_var(&config_envs, "AWS_DEFAULT_REGION")?;
+    ensure_env_var_or_default(&mut config_envs, "AWS_PAGER", "");
 
-    Ok(envs)
+    let all_envs = std::env::vars()
+        .chain(config_envs)
+        .collect::<HashMap<_, _>>();
+
+    Ok(all_envs)
 }
 
 fn ensure_env_var(envs: &HashMap<String, String>, key: impl AsRef<str>) -> Result<(), Error> {

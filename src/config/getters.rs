@@ -49,11 +49,8 @@ impl Config {
         None
     }
 
-    pub fn get_envs_from_tables(&self) -> HashMap<String, String> {
-        let mut envs = std::env::vars()
-            .into_iter()
-            .map(|(k, v)| (k, (v, PathBuf::new())))
-            .collect::<HashMap<_, _>>();
+    pub fn get_envs(&self) -> HashMap<String, String> {
+        let mut envs: HashMap<String, (String, PathBuf)> = HashMap::new();
 
         envs.extend(
             self.get_merged_tables("env")
