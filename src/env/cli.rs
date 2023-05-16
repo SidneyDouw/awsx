@@ -27,9 +27,12 @@ pub fn substitute_env_vars(file: PathBuf, _output: Option<PathBuf>, config: &Con
 }
 
 pub fn print_env_vars(config: &crate::config::Config) -> Result<()> {
-    config
-        .get_envs()
-        .into_iter()
+    let envs = config.get_envs();
+    let keys: Vec<_> = envs.clone().into_iter().map(|(k, _)| k).collect();
+
+    std::env::vars()
+        .chain(envs)
+        .filter(|(k, _)| keys.contains(k))
         .for_each(|(k, v)| println!("{}\t{}", k, v));
 
     Ok(())
