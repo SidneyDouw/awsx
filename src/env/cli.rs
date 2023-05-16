@@ -4,8 +4,10 @@ use std::{collections::HashMap, path::PathBuf};
 
 pub fn substitute_env_vars(file: PathBuf, _output: Option<PathBuf>, config: &Config) -> Result<()> {
     let mut filestring = std::fs::read_to_string(file)?;
-    let env_vars = std::env::vars()
-        .chain(config.get_envs())
+    let env_vars = config
+        .get_envs()
+        .into_iter()
+        .chain(std::env::vars())
         .collect::<HashMap<_, _>>();
 
     filestring.clone().rmatch_indices("{{").for_each(|(i, _)| {
@@ -27,12 +29,15 @@ pub fn substitute_env_vars(file: PathBuf, _output: Option<PathBuf>, config: &Con
 }
 
 pub fn print_env_vars(config: &crate::config::Config) -> Result<()> {
-    let envs = config.get_envs();
-    let keys: Vec<_> = envs.clone().into_iter().map(|(k, _)| k).collect();
+    let config_envs = config.get_envs();
+    let keys: Vec<_> = config_envs.clone().into_iter().map(|(k, _)| k).collect();
 
-    std::env::vars()
-        .chain(envs)
+    config_envs
+        .into_iter()
+        .chain(std::env::vars())
         .filter(|(k, _)| keys.contains(k))
+        .collect::<HashMap<_, _>>()
+        .iter()
         .for_each(|(k, v)| println!("{}\t{}", k, v));
 
     Ok(())

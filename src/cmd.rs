@@ -99,8 +99,9 @@ fn get_envs_with_config_envs(config: &Config) -> Result<HashMap<String, String>,
     ensure_env_var(&config_envs, "AWS_DEFAULT_REGION")?;
     ensure_env_var_or_default(&mut config_envs, "AWS_PAGER", "");
 
-    let all_envs = std::env::vars()
-        .chain(config_envs)
+    let all_envs = config_envs
+        .into_iter()
+        .chain(std::env::vars())
         .collect::<HashMap<_, _>>();
 
     Ok(all_envs)
