@@ -98,6 +98,14 @@ fn main() -> anyhow::Result<()> {
         },
 
         Subcommands::Bucket(cmd) => match cmd {
+            awsx::bucket::Subcommands::Cp {
+                from,
+                to,
+                recursive,
+            } => awsx::bucket::cp(from, to, recursive, &config),
+            awsx::bucket::Subcommands::Rm { path, recursive } => {
+                awsx::bucket::rm(path, recursive, &config)
+            }
             awsx::bucket::Subcommands::Exists { bucket_name } => {
                 awsx::bucket::bucket_exists(&bucket_name, &config)
             }

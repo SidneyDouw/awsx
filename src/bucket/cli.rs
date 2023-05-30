@@ -30,3 +30,30 @@ pub fn put_bucket_policy(bucket_name: &str, policy: &str, config: &Config) -> Re
 
     Ok(())
 }
+
+pub fn cp(
+    from: impl AsRef<str>,
+    to: impl AsRef<str>,
+    recursive: bool,
+    config: &Config,
+) -> Result<()> {
+    let recursive = if recursive { "--recursive" } else { "" };
+
+    run(
+        &format!("aws s3 cp {} {} {}", recursive, from.as_ref(), to.as_ref()),
+        config,
+    )?;
+
+    Ok(())
+}
+
+pub fn rm(path: impl AsRef<str>, recursive: bool, config: &Config) -> Result<()> {
+    let recursive = if recursive { "--recursive" } else { "" };
+
+    run(
+        &format!("aws s3 rm {} {}", recursive, path.as_ref()),
+        config,
+    )?;
+
+    Ok(())
+}
