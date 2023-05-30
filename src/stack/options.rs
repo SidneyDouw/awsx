@@ -13,6 +13,16 @@ pub enum Subcommands {
         template: PathBuf,
     },
 
+    /// Updates a Cloud Formation stack
+    Update {
+        /// The name of the stack
+        stack_name: String,
+
+        /// Path to a Cloud Formation template file
+        #[clap(long, short = 't')]
+        template: PathBuf,
+    },
+
     /// Destroys a Cloud Formation stack
     #[clap(visible_alias = "delete")]
     Destroy {

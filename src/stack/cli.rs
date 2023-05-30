@@ -9,7 +9,7 @@ use std::path::Path;
 pub fn create(
     stack_name: impl AsRef<str>,
     template: impl AsRef<Path>,
-    config: &mut Config,
+    config: &Config,
 ) -> Result<()> {
     // TODO: Can we deduplicate some code here regarding the expression evaluation in the config parameters?
     // This work is already being done inside the `run` function
@@ -27,6 +27,37 @@ pub fn create(
     run(
         &format!(
             "aws cloudformation wait stack-create-complete --stack-name {}",
+            stack_name.as_ref()
+        ),
+        config,
+    )?;
+
+    println!("Done");
+
+    Ok(())
+}
+
+pub fn update(
+    stack_name: impl AsRef<str>,
+    template: impl AsRef<Path>,
+    config: &Config,
+) -> Result<()> {
+    // TODO: Can we deduplicate some code here regarding the expression evaluation in the config parameters?
+    // This work is already being done inside the `run` function
+    let parameters = parameters_to_string(get_parameter_values_from_config(&template, config)?);
+
+    let cmd = format!(
+            "aws cloudformation update-stack --stack-name {} --template-body file://{} --capabilities CAPABILITY_NAMED_IAM {}",
+            stack_name.as_ref(), template.as_ref().to_string_lossy(), parameters
+        );
+    run(&cmd, config)?;
+
+    println!("Updating stack: {:?}", stack_name.as_ref());
+    println!("Waiting for completion...");
+
+    run(
+        &format!(
+            "aws cloudformation wait stack-update-complete --stack-name {}",
             stack_name.as_ref()
         ),
         config,

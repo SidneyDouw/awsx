@@ -43,7 +43,7 @@ pub enum Subcommands {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let mut config = Config::from_path(args.config, Default::default())?;
+    let config = Config::from_path(args.config, Default::default())?;
 
     match args.cmd {
         Subcommands::Env(cmd) => match cmd {
@@ -57,7 +57,11 @@ fn main() -> anyhow::Result<()> {
             awsx::stack::Subcommands::Create {
                 stack_name,
                 template,
-            } => awsx::stack::create(stack_name, template, &mut config),
+            } => awsx::stack::create(stack_name, template, &config),
+            awsx::stack::Subcommands::Update {
+                stack_name,
+                template,
+            } => awsx::stack::update(stack_name, template, &config),
             awsx::stack::Subcommands::Destroy { stack_name } => {
                 awsx::stack::destroy(stack_name, &config)
             }
