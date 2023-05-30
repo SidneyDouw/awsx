@@ -37,6 +37,9 @@ pub enum Subcommands {
 
     #[clap(subcommand)]
     Lambda(awsx::lambda::Subcommands),
+
+    #[clap(subcommand)]
+    Route53(awsx::route53::Subcommands),
 }
 
 #[cfg(not(tarpaulin_include))]
@@ -109,6 +112,12 @@ fn main() -> anyhow::Result<()> {
                 function_name,
                 zip_file,
             } => awsx::lambda::update_function(function_name, zip_file, &config),
+        },
+
+        Subcommands::Route53(cmd) => match cmd {
+            awsx::route53::Subcommands::HostedZoneId { hosted_zone_name } => {
+                awsx::route53::hosted_zone_id(hosted_zone_name, &config)
+            }
         },
     }?;
 
