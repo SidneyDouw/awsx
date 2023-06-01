@@ -91,7 +91,8 @@ fn main() -> anyhow::Result<()> {
                 name,
                 instance_id,
                 description,
-            } => awsx::ec2::create_image(name, instance_id, description, &config),
+                tag,
+            } => awsx::ec2::create_image(name, instance_id, description, tag, &config),
             awsx::ec2::Subcommands::GetLatestAMI { filter, with_name } => {
                 awsx::ec2::get_latest_ami(filter, with_name, &config)
             }

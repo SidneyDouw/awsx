@@ -76,16 +76,28 @@ pub fn create_image(
     name: String,
     instance_id: String,
     description: Option<String>,
+    tags: Vec<String>,
     config: &Config,
 ) -> Result<()> {
     let cmd = format!(
         "aws ec2 create-image --name {} --instance-id {} --output text",
         name, instance_id,
     );
-    let cmd = match description {
+    let mut cmd = match description {
         Some(description) => format!("{cmd} --description \"{description}\""),
         _ => cmd,
     };
+
+    if !tags.is_empty() {
+        cmd.push_str(&format!(
+            " --tag-specifications \"ResourceType=image, Tags=["
+        ));
+        for t in tags {
+            let kvpair = t.split(',').collect::<Vec<_>>();
+            cmd.push_str(&format!("{{Key={},Value={}}},", kvpair[0], kvpair[1]));
+        }
+        cmd.push_str(&format!("]\""));
+    }
 
     let image_id = read(&cmd, config)?;
 

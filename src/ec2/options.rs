@@ -32,6 +32,10 @@ pub enum Subcommands {
         /// Description for the AMI
         #[clap(long, short = 'd')]
         description: Option<String>,
+
+        /// A single tag to assign to the image. Argument can be used multiple times.
+        #[clap(long)]
+        tag: Vec<String>,
     },
 
     /// Get the id of the latest AMI
