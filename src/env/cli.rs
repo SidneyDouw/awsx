@@ -14,11 +14,11 @@ pub fn substitute_env_vars(file: PathBuf, _output: Option<PathBuf>, config: &Con
         let offset = filestring[i..].find("}}").expect("braces not closed") + 2;
 
         let trim_chars: &[_] = &['{', '}', '$', ' '];
-        let env_var = (&filestring[i..i + offset]).trim_matches(trim_chars);
+        let env_var = filestring[i..i + offset].trim_matches(trim_chars);
 
         let env_var_value = env_vars
             .get(env_var)
-            .expect(&format!("environment variable not set: {}", env_var));
+            .unwrap_or_else(|| panic!("environment variable not set: {}", env_var));
 
         filestring.replace_range(i..i + offset, env_var_value)
     });
@@ -30,7 +30,7 @@ pub fn substitute_env_vars(file: PathBuf, _output: Option<PathBuf>, config: &Con
 
 pub fn print_env_vars(config: &crate::config::Config) -> Result<()> {
     let config_envs = config.get_envs();
-    let keys: Vec<_> = config_envs.clone().into_iter().map(|(k, _)| k).collect();
+    let keys: Vec<_> = config_envs.clone().into_keys().collect();
 
     config_envs
         .into_iter()

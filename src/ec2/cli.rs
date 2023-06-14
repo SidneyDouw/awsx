@@ -22,42 +22,42 @@ pub fn create_instance(options: CreateInstanceOptions, config: &Config) -> Resul
 
     let mut cmd_str = String::from("aws ec2 run-instances ");
     cmd_str.push_str(&format!("--count {} ", count));
-    keypair.map(|keypair| cmd_str.push_str(&format!("--key-name {} ", keypair)));
+    if let Some(keypair) = keypair {
+        cmd_str.push_str(&format!("--key-name {} ", keypair));
+    }
     cmd_str.push_str(&format!("--image-id {} ", image_id));
     cmd_str.push_str(&format!("--instance-type {} ", instance_type));
     cmd_str.push_str(&format!("--block-device-mappings \"DeviceName=/dev/sda1, Ebs={{VolumeType={}, VolumeSize={}, Iops=1000, DeleteOnTermination=true }}\" ", volume_type, volume_size));
-    cmd_str.push_str(&format!("--associate-public-ip-address "));
+    cmd_str.push_str("--associate-public-ip-address ");
 
     if let Some(security_group_ids) = security_group_ids {
         cmd_str.push_str(&format!("--security-group-ids {} ", security_group_ids));
-    } else {
-        if !security_group_id_vec.is_empty() {
-            cmd_str.push_str(&format!("--security-group-ids "));
-            for id in security_group_id_vec {
-                cmd_str.push_str(&format!("{} ", id));
-            }
+    } else if !security_group_id_vec.is_empty() {
+        cmd_str.push_str("--security-group-ids ");
+        for id in security_group_id_vec {
+            cmd_str.push_str(&format!("{} ", id));
         }
     }
 
-    user_data.map(|user_data| cmd_str.push_str(&format!("--user-data {} ", user_data)));
+    if let Some(user_data) = user_data {
+        cmd_str.push_str(&format!("--user-data {} ", user_data));
+    }
 
     if !tags.is_empty() {
-        cmd_str.push_str(&format!(
-            "--tag-specifications \"ResourceType=instance, Tags=["
-        ));
+        cmd_str.push_str("--tag-specifications \"ResourceType=instance, Tags=[");
         for t in tags {
             let kvpair = t.split(',').collect::<Vec<_>>();
             cmd_str.push_str(&format!("{{Key={},Value={}}},", kvpair[0], kvpair[1]));
         }
-        cmd_str.push_str(&format!("]\" "));
+        cmd_str.push_str("]\" ");
     }
 
-    instance_profile.map(|instance_profile| {
+    if let Some(instance_profile) = instance_profile {
         cmd_str.push_str(&format!(
             "--iam-instance-profile \"Name={}\" ",
             instance_profile
         ))
-    });
+    }
 
     let instance_info = read(&cmd_str, config)?;
 
@@ -89,14 +89,12 @@ pub fn create_image(
     };
 
     if !tags.is_empty() {
-        cmd.push_str(&format!(
-            " --tag-specifications \"ResourceType=image, Tags=["
-        ));
+        cmd.push_str(" --tag-specifications \"ResourceType=image, Tags=[");
         for t in tags {
             let kvpair = t.split(',').collect::<Vec<_>>();
             cmd.push_str(&format!("{{Key={},Value={}}},", kvpair[0], kvpair[1]));
         }
-        cmd.push_str(&format!("]\""));
+        cmd.push_str("]\"");
     }
 
     let image_id = read(&cmd, config)?;
@@ -163,8 +161,8 @@ pub fn stop_instance(instance_id: String, config: &Config) -> Result<(), anyhow:
 }
 
 pub fn get_latest_ami(filter: Option<String>, with_name: bool, config: &Config) -> Result<()> {
-    let cmd = format!("aws ec2 describe-images --owners self --query \"Images[].[CreationDate, Name, ImageId] | sort_by(@, &[0])\" --output text");
-    let out = read(&cmd, config)?;
+    let cmd = "aws ec2 describe-images --owners self --query \"Images[].[CreationDate, Name, ImageId] | sort_by(@, &[0])\" --output text";
+    let out = read(cmd, config)?;
     let latest_ami = out
         .lines()
         .filter_map(|line| {

@@ -5,7 +5,7 @@ use crate::{
 use anyhow::Result;
 
 pub fn bucket_exists(bucket_name: &str, config: &Config) -> Result<()> {
-    let all_buckets = read(&format!("aws s3 ls --output text"), config)?;
+    let all_buckets = read("aws s3 ls --output text", config)?;
 
     let bucket_exists = all_buckets
         .lines()
