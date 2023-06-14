@@ -175,8 +175,17 @@ pub fn get_latest_ami(filter: Option<String>, with_name: bool, config: &Config) 
                 true => format!("{}\t{}", name, id),
                 false => id.to_owned(),
             };
+
             match &filter {
-                Some(filter) => name.contains(filter).then(|| out),
+                Some(filter) => {
+                    if let Some(filter) = filter.strip_prefix('$') {
+                        let envs = config.get_envs();
+                        let var = envs.get(filter)?;
+                        name.contains(var).then_some(out)
+                    } else {
+                        name.contains(filter).then_some(out)
+                    }
+                }
                 None => Some(out),
             }
         })
