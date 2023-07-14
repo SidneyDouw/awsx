@@ -25,6 +25,11 @@ impl Config {
             .canonicalize()
             .map_err(|_| Error::load_error(config_path, "could not make an absolute path"))?;
 
+        let filename = config_path.file_name().ok_or(Error::load_error(
+            &config_path,
+            "could not get filename from path",
+        ))?;
+
         let mut files: HashMap<PathBuf, Value> = HashMap::new();
 
         if options.nested {
@@ -32,9 +37,9 @@ impl Config {
                 Error::load_error(&config_path, &format!("could not find project root: {}", e))
             })?;
 
-            let mut config_path = config_path;
+            let mut config_path = config_path.clone();
             while config_path.pop() {
-                let new_path = &config_path.join(&options.filename);
+                let new_path = &config_path.join(filename);
                 if let Ok(m) = std::fs::metadata(new_path) {
                     if m.is_file() {
                         let file = Config::load_one(new_path)?;
@@ -47,7 +52,8 @@ impl Config {
                 }
             }
         } else {
-            files.insert(config_path.clone(), Config::load_one(&config_path)?);
+            let data = Config::load_one(&config_path)?;
+            files.insert(config_path, data);
         }
 
         Ok(Config { file_map: files })

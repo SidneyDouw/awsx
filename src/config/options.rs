@@ -2,15 +2,18 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct Options {
-    pub filename: String,
+    /// configures if additional configs in the parent directories should be loaded as well
     pub nested: bool,
+    /// manually sets the project root for nested configs
+    /// when scanning for additional configs in parent directories, it will not look beyond this
+    /// directory
+    /// if not specified, it will look for a `.git` folder to determine the project root
     pub project_root: Option<PathBuf>,
 }
 
 impl Default for Options {
     fn default() -> Self {
         Self {
-            filename: String::from("config.toml"),
             nested: true,
             project_root: None,
         }
@@ -34,7 +37,7 @@ impl Options {
                     }
                 }
                 if path.parent().is_none() {
-                    return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Could not find a .git diretory in any parent folder determining the project root"))
+                    return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Could not find a .git diretory in any parent folder"))
                 }
                 path.pop();
             };

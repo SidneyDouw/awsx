@@ -49,6 +49,7 @@ impl Config {
         None
     }
 
+    /// returns a HashMap of all envs and exposed parameters of a config
     pub fn get_envs(&self) -> HashMap<String, String> {
         let mut envs: HashMap<String, (String, PathBuf)> = HashMap::new();
 
@@ -82,7 +83,7 @@ impl Config {
     }
 
     fn resolve_expression_values(&self, envs: &mut HashMap<String, (String, PathBuf)>) {
-        let cleaned_envs = envs
+        let mut cleaned_envs = envs
             .clone()
             .into_iter()
             .map(|(k, (v, _))| (k, v))
@@ -95,11 +96,15 @@ impl Config {
 
                 let val = read_with_dir_and_env(exp, workdir, &cleaned_envs, self)
                     .expect("valid expression");
+
+                cleaned_envs.insert(key.clone(), val.clone());
                 envs.entry(key).and_modify(|(v, _)| *v = val);
             }
         }
     }
 
+    /// Gets a key from all config files, merges them according to priority into one HashMap and
+    /// returns that
     pub(crate) fn get_merged_tables(
         &self,
         key: impl AsRef<str>,
@@ -222,6 +227,8 @@ impl Config {
         }
     }
 
+    /// returns a sorted Vec of the filepaths from lowest to highest priority, where the inner files have higher
+    /// priority than the outer files
     pub(crate) fn sorted_filepaths(&self) -> Vec<PathBuf> {
         let mut filepaths = self
             .file_map
