@@ -18,7 +18,7 @@ impl Default for Options {
 }
 
 impl Options {
-    /// If `project_root` is `Some(path)` it will be returned as an absolute path.
+    /// If `self.project_root` is `Some(path)` it will be returned as an absolute path.
     /// If it is `None` it will find the first parent folder containing a `.git`
     /// directory and return that as an absolute path.
     pub fn get_project_root(&self) -> Result<PathBuf, std::io::Error> {
@@ -32,6 +32,9 @@ impl Options {
                     if m.is_dir() {
                         break path;
                     }
+                }
+                if path.parent().is_none() {
+                    return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Could not find a .git diretory in any parent folder determining the project root"))
                 }
                 path.pop();
             };

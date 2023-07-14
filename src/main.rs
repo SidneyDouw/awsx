@@ -45,9 +45,8 @@ pub enum Subcommands {
 #[cfg(not(tarpaulin_include))]
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-
     let config = Config::from_path(args.config, Default::default())?;
-
+ 
     match args.cmd {
         Subcommands::Env(cmd) => match cmd {
             awsx::env::Subcommands::Substitute { file, output } => {
