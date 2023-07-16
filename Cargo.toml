@@ -5,9 +5,13 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.66"
+chacha20poly1305 = { version = "0.10.1", features = ["stream"] }
 clap = {version = "4.0.18", features = ["derive"]}
 convert_case = "0.6.0"
 duct = "0.13.5"
+rand = "0.8.5"
+rust-argon2 = "1.0.0"
 thiserror = "1.0.37"
 toml = "0.5.9"
 yaml-rust = "0.4.5"
+zeroize = "1.6.0"

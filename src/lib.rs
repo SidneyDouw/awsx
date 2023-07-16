@@ -6,3 +6,4 @@ pub mod env;
 pub mod lambda;
 pub mod route53;
 pub mod stack;
+pub mod secrets;

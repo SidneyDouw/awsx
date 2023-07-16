@@ -27,6 +27,9 @@ pub enum Subcommands {
     Env(awsx::env::Subcommands),
 
     #[clap(subcommand)]
+    Secrets(awsx::secrets::Subcommands),
+
+    #[clap(subcommand)]
     Stack(awsx::stack::Subcommands),
 
     #[clap(subcommand)]
@@ -53,6 +56,15 @@ fn main() -> anyhow::Result<()> {
                 awsx::env::substitute_env_vars(file, output, &config)
             }
             awsx::env::Subcommands::Print {} => awsx::env::print_env_vars(&config),
+        },
+
+        Subcommands::Secrets(cmd) => match cmd {
+            awsx::secrets::Subcommands::Encrypt { file, password } => {
+                awsx::secrets::encrypt(file, password)
+            }
+            awsx::secrets::Subcommands::Decrypt { file, password } => {
+                awsx::secrets::decrypt(file, password)
+            }
         },
 
         Subcommands::Stack(cmd) => match cmd {

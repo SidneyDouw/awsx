@@ -42,8 +42,8 @@ impl Config {
                 let new_path = &config_path.join(filename);
                 if let Ok(m) = std::fs::metadata(new_path) {
                     if m.is_file() {
-                        let file = Config::load_one(new_path)?;
-                        files.insert(new_path.clone(), file);
+                        let data = Config::load_one(new_path)?;
+                        files.insert(new_path.clone(), data);
                     }
                 }
 
