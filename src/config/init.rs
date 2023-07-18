@@ -23,7 +23,7 @@ impl Config {
         let config_path = config_path
             .as_ref()
             .canonicalize()
-            .map_err(|_| Error::load_error(config_path, "could not make an absolute path"))?;
+            .map_err(|_| Error::load_error(&config_path, "could not make an absolute path"))?;
 
         let filename = config_path.file_name().ok_or(Error::load_error(
             &config_path,

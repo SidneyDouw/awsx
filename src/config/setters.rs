@@ -5,7 +5,7 @@ use toml::{value::Map, Value};
 
 /// Setters
 impl Config {
-    pub fn set(&mut self, key: impl AsRef<str>, value: Value) {
+    fn set(&mut self, key: impl AsRef<str>, value: Value) {
         let keys = key.as_ref().split('.').collect::<Vec<_>>();
         let last_key = keys.last().expect("at least one entry").to_string();
 

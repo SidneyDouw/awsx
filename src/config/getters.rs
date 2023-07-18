@@ -1,5 +1,5 @@
 use super::{Config, OVERRIDE_FILEPATH};
-use crate::cmd::read_with_dir_and_env;
+use crate::{cmd::read_with_dir_and_env, config::Error, secrets};
 use convert_case::{Case, Casing};
 use core::panic;
 use std::{
@@ -80,6 +80,40 @@ impl Config {
         self.resolve_expression_values(&mut envs);
 
         envs.into_iter().map(|(k, (v, _))| (k, v)).collect()
+    }
+
+    pub fn get_secrets(&self, password: impl AsRef<str>) -> HashMap<String, String> {
+        let mut secrets: HashMap<String, String> = HashMap::new();
+
+        if let Some((val, mut config_path)) = self.get_with_filepath("secrets.files") {
+            config_path.pop();
+            let secrets_filepath = config_path.join(val.as_str().expect("filepath to secret"));
+
+            let decrypted_toml =
+                secrets::core::decrypt(secrets_filepath, password).expect("correct password");
+
+            let parsed = String::from_utf8(decrypted_toml)
+                .expect("valid utf-8")
+                .parse::<Value>()
+                .map_err(|e| Error::load_error(config_path, &format!("Invalid TOML: {}", e)))
+                .expect("valid toml");
+
+            match parsed {
+                Value::Table(t) => {
+                    t.into_iter().for_each(|(k, v)| match v {
+                        Value::String(s) => {
+                            secrets.insert(k, s);
+                        }
+                        x => panic!("value for {k} is not a string, found {:?}", x),
+                    });
+                }
+                _ => panic!("value for secrets is not a table"),
+            };
+
+            secrets
+        } else {
+            secrets
+        }
     }
 
     fn resolve_expression_values(&self, envs: &mut HashMap<String, (String, PathBuf)>) {

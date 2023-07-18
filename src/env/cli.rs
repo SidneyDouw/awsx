@@ -28,10 +28,11 @@ pub fn substitute_env_vars(file: PathBuf, _output: Option<PathBuf>, config: &Con
     Ok(())
 }
 
-pub fn print_env_vars(config: &crate::config::Config) -> Result<()> {
+pub fn print_env_vars(config: &crate::config::Config, password: Option<impl AsRef<str>>) -> Result<()> {
     let config_envs = config.get_envs();
     let keys: Vec<_> = config_envs.clone().into_keys().collect();
 
+    println!("[env]");
     config_envs
         .into_iter()
         .chain(std::env::vars())
@@ -39,6 +40,12 @@ pub fn print_env_vars(config: &crate::config::Config) -> Result<()> {
         .collect::<HashMap<_, _>>()
         .iter()
         .for_each(|(k, v)| println!("{}\t{}", k, v));
+
+    if let Some(password) = password {
+        println!("[secrets]");
+        let secrets = config.get_secrets(&password);
+        secrets.iter().for_each(|(k, v)| println!("{}\t{}", k, v));
+    }
 
     Ok(())
 }
