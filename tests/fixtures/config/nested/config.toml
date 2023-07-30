@@ -2,9 +2,10 @@ var_a = "abc"
 var_b = "def"
 var_c = "ghi"
 
-[env]
+[envs]
 AWS_PROFILE = "default"
 AWS_DEFAULT_REGION = "eu-central-1"
+BASE_VALUE = "some value"
 
 [sub]
 var_a = "xyz"

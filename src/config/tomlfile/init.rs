@@ -3,7 +3,7 @@ use super::{
     traits::TomlFileInit,
     ConfigFile, Error, SecretsFile,
 };
-use crate::config2::verify_path::VerifiedPath;
+use crate::config::verify_path::VerifiedPath;
 
 impl TomlFileInit for ConfigFile {
     fn from_path(path: &VerifiedPath) -> Result<Self, Error> {

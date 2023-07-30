@@ -48,14 +48,16 @@ pub enum Subcommands {
 #[cfg(not(tarpaulin_include))]
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-    let config = Config::from_path(args.config, Default::default())?;
+    let config = Config::from_path(args.config)?;
 
     match args.cmd {
         Subcommands::Env(cmd) => match cmd {
             awsx::env::Subcommands::Substitute { file, output } => {
                 awsx::env::substitute_env_vars(file, output, &config)
             }
-            awsx::env::Subcommands::Print {} => awsx::env::print_env_vars(&config, args.secrets_password),
+            awsx::env::Subcommands::Print {} => {
+                awsx::env::print_env_vars(&config, args.secrets_password)
+            }
         },
 
         Subcommands::Secrets(cmd) => match cmd {

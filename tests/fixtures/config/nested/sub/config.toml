@@ -1,0 +1,12 @@
+var_a = "cba"
+
+[parameters]
+Param_1 = {value = "Hi there", expose = true }
+PARAM_2 = {value = "{{ echo $(pwd) }}", expose = true}
+
+[envs]
+AWS_PROFILE = "edited"
+AWS_DEFAULT_REGION = "eu-central-1"
+
+[sub.b]
+var_c = "sph"

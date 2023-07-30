@@ -15,10 +15,10 @@ pub enum Error {
     SecretReference,
 
     #[error(transparent)]
-    Parse(#[from] crate::config2::tomlfile::parse::Error),
+    Parse(#[from] crate::config::tomlfile::parse::Error),
 
     #[error(transparent)]
-    Verify(#[from] crate::config2::verify_path::Error),
+    Verify(#[from] crate::config::verify_path::Error),
 
     #[error(transparent)]
     Io(#[from] std::io::Error),

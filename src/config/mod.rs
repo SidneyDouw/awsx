@@ -1,18 +1,20 @@
-pub use self::error::Error;
-pub use self::options::Options;
-use std::{collections::HashMap, path::PathBuf};
-use toml::Value;
-
-mod error;
-mod options;
-
 mod getters;
 mod init;
-mod setters;
+#[cfg(test)]
+mod tests;
+mod tomlfile;
+mod verify_path;
 
-const OVERRIDE_FILEPATH: &str = "overrides";
+use self::tomlfile::ConfigFile;
+use std::{collections::HashMap, path::PathBuf};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("Error while trying to resolve an expression value: {0}")]
+    Expression(#[from] crate::cmd::Error),
+}
+
+#[derive(Debug)]
 pub struct Config {
-    file_map: HashMap<PathBuf, Value>,
+    configs: HashMap<PathBuf, ConfigFile>,
 }

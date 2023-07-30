@@ -1,10 +1,10 @@
 mod init {
-    use crate::config2::Config;
+    use crate::config::Config;
     use std::path::PathBuf;
 
     #[test]
     fn config() {
-        const PRINT_OUTPUT: bool = true;
+        const PRINT_OUTPUT: bool = false;
 
         let paths = [
             // test invalid unicode in path
@@ -42,5 +42,19 @@ mod init {
                 }
             }
         }
+    }
+}
+
+mod getters {
+    use crate::config::Config;
+    use std::path::PathBuf;
+
+    #[test]
+    fn get_envs() {
+        let config = Config::from_path(&PathBuf::from(
+            "tests/fixtures/config/nested/sub/config.toml",
+        ))
+        .unwrap();
+        config.get_envs().unwrap();
     }
 }

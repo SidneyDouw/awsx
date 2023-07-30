@@ -1,76 +1,83 @@
-use super::{Config, Error, Options};
+use crate::config::tomlfile::traits::TomlFileInit;
+use crate::config::{verify_path::VerifiedPath, Config, ConfigFile};
 use std::{
     collections::HashMap,
+    fs::metadata,
     path::{Path, PathBuf},
 };
-use toml::Value;
 
-impl Default for Config {
-    fn default() -> Config {
-        Config::new()
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("Error while verifying path:\n  {0}")]
+    VerifyPath(#[from] crate::config::verify_path::Error),
+
+    #[error("No .git file / folder found while looking for root folder")]
+    RootFolder,
+
+    #[error("Error while parsing TOML file at:\n  \"{path}\"\n{source}")]
+    Toml {
+        path: PathBuf,
+        #[source]
+        source: toml::de::Error,
+    },
+
+    #[error("Error while loading file:\n  {0}")]
+    ConfigFile(#[from] crate::config::tomlfile::Error),
+}
+
+impl Error {
+    pub fn from_toml(path: &Path, err: toml::de::Error) -> Error {
+        Error::Toml {
+            path: path.to_owned(),
+            source: err,
+        }
     }
 }
 
-/// Initialize
 impl Config {
-    pub fn new() -> Config {
-        Config {
-            file_map: HashMap::new(),
-        }
-    }
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self, Error> {
+        let path = VerifiedPath::try_from(path.as_ref())?;
+        let filename = path.get_file_name();
+        let root_folder = Self::find_root_folder(&path)?;
 
-    pub fn from_path(config_path: impl AsRef<Path>, options: Options) -> Result<Config, Error> {
-        let config_path = config_path
-            .as_ref()
-            .canonicalize()
-            .map_err(|_| Error::load_error(&config_path, "could not make an absolute path"))?;
+        let mut configs: HashMap<PathBuf, ConfigFile> = HashMap::new();
+        let mut path = path.0;
 
-        let filename = config_path.file_name().ok_or(Error::load_error(
-            &config_path,
-            "could not get filename from path",
-        ))?;
-
-        let mut files: HashMap<PathBuf, Value> = HashMap::new();
-
-        if options.nested {
-            let project_root = options.get_project_root().map_err(|e| {
-                Error::load_error(&config_path, &format!("could not find project root: {}", e))
-            })?;
-
-            let mut config_path = config_path.clone();
-            while config_path.pop() {
-                let new_path = &config_path.join(filename);
-                if let Ok(m) = std::fs::metadata(new_path) {
-                    if m.is_file() {
-                        let data = Config::load_one(new_path)?;
-                        files.insert(new_path.clone(), data);
-                    }
-                }
-
-                if config_path.ends_with(&project_root) {
-                    break;
-                }
+        while path.pop() {
+            if let Ok(new_path) = VerifiedPath::try_from(path.join(&filename)) {
+                let config = ConfigFile::from_path(&new_path)?;
+                configs.insert(new_path.0, config);
             }
-        } else {
-            let data = Config::load_one(&config_path)?;
-            files.insert(config_path, data);
+
+            if path.ends_with(&root_folder) {
+                break;
+            }
         }
 
-        Ok(Config { file_map: files })
+        Ok(Self { configs })
     }
+}
 
-    fn load_one(config_path: impl AsRef<Path>) -> Result<Value, Error> {
-        match std::fs::read_to_string(config_path.as_ref()) {
-            Ok(bytes) => bytes
-                .parse::<Value>()
-                .map_err(|e| Error::load_error(config_path, &format!("Invalid TOML: {}", e))),
-            Err(e) => Err(Error::load_error(config_path, &e.to_string())),
+impl Config {
+    // TODO: find a better way of finding a root folder than the presence of a git file / folder
+
+    /// Starting from the given path, iterate through each parent folder until we find a `.git`
+    /// directory, aka our `root_folder`.
+    ///
+    /// Any config file within a parent folder up to and including the root folder will be loaded
+    /// into the [Config].
+    fn find_root_folder(path: &VerifiedPath) -> Result<PathBuf, Error> {
+        let mut path = path.0.to_owned();
+        while path.pop() {
+            if metadata(path.join(".git")).is_ok() {
+                break;
+            };
+
+            if path.parent().is_none() {
+                return Err(Error::RootFolder);
+            }
         }
-    }
 
-    // TODO: `verify` config after loading to make sure certain expectations are met
-    #[allow(dead_code)]
-    fn verify(&self) -> bool {
-        todo!()
+        Ok(path)
     }
 }

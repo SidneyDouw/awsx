@@ -1,7 +1,7 @@
 use toml::{value::Map, Value};
 
 use super::{Error, SecretsFile};
-use crate::config2::verify_path::VerifiedPath;
+use crate::config::verify_path::VerifiedPath;
 
 pub(crate) trait TomlFileInit {
     fn from_path(path: &VerifiedPath) -> Result<Self, Error>

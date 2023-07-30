@@ -4,6 +4,9 @@ use std::path::Path;
 pub enum Error {
     #[error("error while loading the config file at {:?}\n\t{:?}", path, msg)]
     Load { path: String, msg: String },
+
+    #[error(transparent)]
+    IO(#[from] std::io::Error)
 }
 
 #[cfg(not(tarpaulin_include))]

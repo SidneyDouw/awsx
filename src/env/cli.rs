@@ -5,7 +5,7 @@ use std::{collections::HashMap, path::PathBuf};
 pub fn substitute_env_vars(file: PathBuf, _output: Option<PathBuf>, config: &Config) -> Result<()> {
     let mut filestring = std::fs::read_to_string(file)?;
     let env_vars = config
-        .get_envs()
+        .get_envs()?
         .into_iter()
         .chain(std::env::vars())
         .collect::<HashMap<_, _>>();
@@ -28,8 +28,8 @@ pub fn substitute_env_vars(file: PathBuf, _output: Option<PathBuf>, config: &Con
     Ok(())
 }
 
-pub fn print_env_vars(config: &crate::config::Config, password: Option<impl AsRef<str>>) -> Result<()> {
-    let config_envs = config.get_envs();
+pub fn print_env_vars(config: &Config, _password: Option<impl AsRef<str>>) -> Result<()> {
+    let config_envs = config.get_envs()?;
     let keys: Vec<_> = config_envs.clone().into_keys().collect();
 
     println!("[env]");
@@ -41,11 +41,11 @@ pub fn print_env_vars(config: &crate::config::Config, password: Option<impl AsRe
         .iter()
         .for_each(|(k, v)| println!("{}\t{}", k, v));
 
-    if let Some(password) = password {
-        println!("[secrets]");
-        let secrets = config.get_secrets(&password);
-        secrets.iter().for_each(|(k, v)| println!("{}\t{}", k, v));
-    }
+    // if let Some(password) = password {
+    //     println!("[secrets]");
+    //     let secrets = config.get_secret_envs(&password);
+    //     secrets.iter().for_each(|(k, v)| println!("{}\t{}", k, v));
+    // }
 
     Ok(())
 }
