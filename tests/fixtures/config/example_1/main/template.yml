@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  ProjectName:
+    Type: String
+
+  LambdaName:
+    Type: String
+
+  USCertificate:
+    Type: String
+
+  USWildcardCertificate:
+    Type: String
+
+  CertificateDomainName:
+    Type: String
+
+  MainFrontendDomainName:
+    Type: String
+
+  BackendApiDomainName:
+    Type: String
+
+  AppDomainName:
+    Type: String
+
+  HostedZoneName:
+    Type: String
+
+  HostedZoneId:
+    Type: String
+
+  BucketName:
+    Type: String
+
+  BucketExists:
+    Type: String
+    AllowedValues:
+      - true
+      - false
+
+Conditions:
+  CreateBucket: !Not [!Equals [!Ref BucketExists, true]]
+
+Resources:
+
+Outputs:

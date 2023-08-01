@@ -2,6 +2,7 @@ use super::{tomlfile::traits::TomlFileGetters, Config, Error};
 use crate::cmd::read_with_dir_and_env;
 use convert_case::{Case, Casing};
 use std::{
+    cmp::Ordering,
     collections::HashMap,
     path::{Path, PathBuf},
 };
@@ -12,31 +13,30 @@ impl Config {
         &self,
         key_mask: Option<&Vec<String>>,
     ) -> Result<HashMap<String, String>, Error> {
-        let mut map = HashMap::new();
         let config_envs = Self::get_envs(self)?;
 
+        let mut map = HashMap::new();
         for path in self.sorted_filepaths().into_iter() {
             let config = self.configs.get(path).expect("config exists");
 
-            for (k, v) in config.parameters().iter() {
-                if map.contains_key(k) {
+            let mut parameters = config
+                .parameters()
+                .iter()
+                .map(|(k, v)| (k.to_owned(), Self::extract_value(v)))
+                .collect::<Vec<_>>();
+
+            Self::sort_by_value_with_expression(&mut parameters);
+
+            for (k, v) in parameters.into_iter() {
+                if map.contains_key(&k) {
                     continue;
                 }
 
                 if let Some(key_mask) = key_mask {
-                    if !key_mask.contains(k) {
+                    if !key_mask.contains(&k) {
                         continue;
                     }
                 }
-
-                let v = match v {
-                    Value::String(s) => s.to_owned(),
-                    Value::Table(t) => match t.get("value").and_then(|v| v.as_str()) {
-                        Some(v) => v.to_owned(),
-                        None => todo!(),
-                    },
-                    _ => todo!(),
-                };
 
                 map.insert(
                     k.to_owned(),
@@ -53,45 +53,48 @@ impl Config {
         for path in self.sorted_filepaths().into_iter() {
             let config = self.configs.get(path).expect("config exists");
 
-            for (k, v) in config.parameters().iter() {
-                if map.contains_key(k) {
+            // TODO: potential sorting issue when parameter expressions depend on envs or the other
+            // way around
+
+            let mut parameters = config
+                .parameters()
+                .iter()
+                .filter_map(|(k, v)| Self::extract_exposed_value(v).map(|v| (k.to_owned(), v)))
+                .collect::<Vec<_>>();
+
+            Self::sort_by_value_with_expression(&mut parameters);
+
+            for (k, v) in parameters.into_iter() {
+                if map.contains_key(&k) {
                     continue;
                 }
 
-                if let Some((k, v)) = v
-                    .as_table()
-                    .and_then(|t| match (t.get("value"), t.get("expose")) {
-                        (Some(Value::String(s)), Some(Value::Boolean(b))) if *b => {
-                            let k = format!("AWSX_PARAMETER_{}", k.to_case(Case::UpperSnake));
-                            Some((k, s.to_owned()))
-                        }
-                        _ => None,
-                    })
-                    .map(|(k, v)| (k, Self::resolve_expression(v, path, &map)))
-                {
-                    map.insert(k, v?);
-                }
+                let k = format!("AWSX_PARAMETER_{}", k.to_case(Case::UpperSnake));
+                map.insert(k, Self::resolve_expression(v, path, &map)?);
             }
 
-            for (k, v) in config.envs().iter() {
-                if map.contains_key(k) {
+            let mut envs = config
+                .envs()
+                .iter()
+                .map(|(k, v)| (k.to_owned(), Self::extract_value(v)))
+                .collect::<Vec<_>>();
+
+            Self::sort_by_value_with_expression(&mut envs);
+
+            for (k, v) in envs.into_iter() {
+                if map.contains_key(&k) {
                     continue;
                 }
 
-                // TODO: Table values not yet supported
-                if let Some((k, v)) = v
-                    .as_str()
-                    .map(|s| (k.to_owned(), s.to_owned()))
-                    .map(|(k, v)| (k, Self::resolve_expression(v, path, &map)))
-                {
-                    map.insert(k, v?);
-                }
+                map.insert(k.to_owned(), Self::resolve_expression(v, path, &map)?);
             }
         }
 
         Ok(map)
     }
 
+    /// Checks if a given value is surrounded by `{{ ... }}`
+    /// If it is, it will run the inner expression via `bash -c ...` and return the value
     fn resolve_expression(
         v: String,
         path: &Path,
@@ -105,6 +108,43 @@ impl Config {
         } else {
             Ok(v)
         }
+    }
+
+    fn extract_exposed_value(v: &Value) -> Option<String> {
+        match v {
+            Value::String(_) => None,
+            Value::Table(t) => match (t.get("value"), t.get("expose")) {
+                (Some(Value::String(s)), Some(Value::Boolean(b))) if *b == true => {
+                    Some(s.to_owned())
+                }
+                (Some(Value::String(_)), _) => None,
+                (Some(_), _) => panic!("expected string value"),
+                (None, _) => panic!("no \"value\" entry found"),
+            },
+            _ => panic!("expected \"string\" or \"table\" value"),
+        }
+    }
+
+    fn extract_value(v: &Value) -> String {
+        match v {
+            Value::String(s) => s.to_owned(),
+            Value::Table(t) => match t.get("value") {
+                Some(Value::String(s)) => s.to_owned(),
+                Some(_) => panic!("expected string value"),
+                None => panic!("no \"value\" entry found"),
+            },
+            _ => panic!("expected \"string\" or \"table\" value"),
+        }
+    }
+
+    fn sort_by_value_with_expression(vec: &mut Vec<(String, String)>) {
+        vec.sort_by(
+            |(_, v_a), (_, v_b)| match (v_a.contains('$'), v_b.contains('$')) {
+                (true, false) => Ordering::Greater,
+                (false, true) => Ordering::Less,
+                _ => Ordering::Equal,
+            },
+        );
     }
 
     /// returns a [Vec] of config paths, sorted from innermost to outermost

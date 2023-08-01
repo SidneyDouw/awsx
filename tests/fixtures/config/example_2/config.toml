@@ -1,0 +1,33 @@
+[parameters]
+ProjectName = { value = "virtual-katharina", expose = true }
+BucketName = { value = '{{ echo "$AWSX_PARAMETER_PROJECT_NAME-bucket" }}', expose = true }
+BucketExists = '{{ awsx -c config.toml bucket exists $AWSX_PARAMETER_BUCKET_NAME }}'
+HostedZoneName = { value = "magig.de", expose = true }
+HostedZoneId = '{{ awsx -c config.toml route53 hosted-zone-id $AWSX_PARAMETER_HOSTED_ZONE_NAME }}'
+WildcardCertDomainName = "*.virtual-katharina.magig.de"
+FrontendDomainName = "virtual-katharina.magig.de"
+BackendApiDomainName = { value = "api.virtual-katharina.magig.de", expose = true }
+ServicesApiDomainName = { value = "services.virtual-katharina.magig.de", expose = true }
+TalkingheadQueueName = '{{ echo "$AWSX_PARAMETER_PROJECT_NAME-talkinghead-queue" }}'
+FaceswapQueueName = '{{ echo "$AWSX_PARAMETER_PROJECT_NAME-faceswap-queue" }}'
+LambdaName = { value = "{{ echo $AWSX_PARAMETER_PROJECT_NAME-backend-functions }}", expose = true }
+UsCertificate = "{{ AWS_REGION=us-east-1 awsx -c config.toml stack output $CERTIFICATE_STACK_NAME Certificate }}"
+USWildcardCertificate = "{{ AWS_REGION=us-east-1 awsx -c config.toml stack output $CERTIFICATE_STACK_NAME WildcardCertificate }}"
+# TODO: make secret
+DBName = { value = "maindb", expose = true }
+DBUsername = { value = "postgres", expose = true }
+DBPassword = { value = "someCrazyPassword", expose = true }
+DBPort = { value = "5432", expose = true }
+
+[envs]
+AWS_PROFILE = "magig"
+AWS_DEFAULT_REGION = "eu-central-1"
+
+CERTIFICATE_STACK_NAME = "virtual-katharina-certificate"
+
+# TODO: make secret
+SERVICES_API_BASIC_AUTH_USERNAME = "user"
+SERVICES_API_BASIC_AUTH_PASSWORD = "password"
+
+# [secrets]
+# files = "./secrets.toml"
