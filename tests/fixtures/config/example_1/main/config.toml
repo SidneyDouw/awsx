@@ -1,0 +1,40 @@
+# Main infrastructure stack
+
+# TODO: extends category to make parent config explicit?
+# extends = "../config.toml
+
+[parameters]
+
+# AWS Route53 Hosted Zone to create various DNS records in for the various services used
+HostedZoneName = { value = "magig.de", expose = true }
+# This creates 2 certificates, one for the specified domain and one wildcard certificate for any subdomains.
+# Any domain names used for any services should be either the specified domain or a subdomain of the specified domain.
+CertificateDomainName = "vodaverse.magig.de"
+# The URL under which the main frontend will be reachable
+MainFrontendDomainName = { value = "vodaverse.magig.de", expose = true }
+# The URL under which the signaling / streaming frontend will be reachable
+AppDomainName = { value = "app.vodaverse.magig.de", expose = true }
+# The URL under which the backend api will be reachable
+BackendApiDomainName = { value = "api.vodaverse.magig.de", expose = true }
+
+# The following parameters probably do not need to be changed
+
+# The Lambda function name
+LambdaName = { value = "{{ echo $AWSX_PARAMETER_PROJECT_NAME-functions }}", expose = true }
+# For some services certificates need to be hosted in the us-east-1 version and so cannot be part of the main stack
+# so they need to be referenced here in order for this stack to be able to use them
+USCertificate = "{{ AWS_REGION=us-east-1 awsx -c config.toml stack output $CERTIFICATE_STACK_NAME Certificate }}"
+USWildcardCertificate = "{{ AWS_REGION=us-east-1 awsx -c config.toml stack output $CERTIFICATE_STACK_NAME WildcardCertificate }}"
+# Automatically gets the id for the HostedZone specified above, necessary for some parts of the stack
+HostedZoneId = '{{ awsx -c config.toml route53 hosted-zone-id $AWSX_PARAMETER_HOSTED_ZONE_NAME }}'
+# Checks if the bucket exists already, if not it will be created, if it does creation will be skipped
+BucketExists = '{{ awsx -c config.toml bucket exists $AWSX_PARAMETER_BUCKET_NAME }}'
+
+[envs]
+
+# Names for the Amazon Machine Images
+# Before Render Instances can be launched it is required
+# to have one of each AMI in the specified AWS account
+RENDER_INSTANCE_AMI_NAME = "RenderInstance"
+MULTIPLAYER_SERVER_AMI_NAME = "MultiplayerServer"
+COTURN_SERVER_AMI_NAME = "CoturnServer"

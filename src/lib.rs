@@ -1,8 +1,10 @@
 pub mod bucket;
 pub mod cmd;
 pub mod config;
+pub mod config_old;
 pub mod ec2;
 pub mod env;
 pub mod lambda;
 pub mod route53;
+pub mod secrets;
 pub mod stack;

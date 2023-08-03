@@ -1,11 +1,11 @@
 use super::Config;
-use crate::config::OVERRIDE_FILEPATH;
+use crate::config_old::OVERRIDE_FILEPATH;
 use std::path::PathBuf;
 use toml::{value::Map, Value};
 
 /// Setters
 impl Config {
-    pub fn set(&mut self, key: impl AsRef<str>, value: Value) {
+    fn set(&mut self, key: impl AsRef<str>, value: Value) {
         let keys = key.as_ref().split('.').collect::<Vec<_>>();
         let last_key = keys.last().expect("at least one entry").to_string();
 

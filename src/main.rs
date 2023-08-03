@@ -9,13 +9,13 @@ pub struct Args {
     #[clap(long, short = 'c')]
     config: PathBuf,
 
-    /// The default value is the first parent folder containing a .git folder.
+    /// The password used to encrypt / decrypt the secrets file linked in the config file
     #[clap(long, short = 'p')]
-    project_root: Option<PathBuf>,
+    secrets_password: Option<String>,
 
-    /// Just print the command(s) that would run instead of actually running them.
-    #[clap(long, short = 'n')]
-    dry_run: Option<PathBuf>,
+    /// The default value is the first parent folder containing a .git folder.
+    #[clap(long, short = 'r')]
+    project_root: Option<PathBuf>,
 
     #[clap(subcommand)]
     cmd: Subcommands,
@@ -25,6 +25,9 @@ pub struct Args {
 pub enum Subcommands {
     #[clap(subcommand)]
     Env(awsx::env::Subcommands),
+
+    #[clap(subcommand)]
+    Secrets(awsx::secrets::Subcommands),
 
     #[clap(subcommand)]
     Stack(awsx::stack::Subcommands),
@@ -45,15 +48,25 @@ pub enum Subcommands {
 #[cfg(not(tarpaulin_include))]
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-
-    let config = Config::from_path(args.config, Default::default())?;
+    let config = Config::from_path(args.config)?;
 
     match args.cmd {
         Subcommands::Env(cmd) => match cmd {
             awsx::env::Subcommands::Substitute { file, output } => {
                 awsx::env::substitute_env_vars(file, output, &config)
             }
-            awsx::env::Subcommands::Print {} => awsx::env::print_env_vars(&config),
+            awsx::env::Subcommands::Print {} => {
+                awsx::env::print_env_vars(&config, args.secrets_password)
+            }
+        },
+
+        Subcommands::Secrets(cmd) => match cmd {
+            awsx::secrets::Subcommands::Encrypt { file, password } => {
+                awsx::secrets::encrypt(file, password)
+            }
+            awsx::secrets::Subcommands::Decrypt { file, password } => {
+                awsx::secrets::decrypt(file, password)
+            }
         },
 
         Subcommands::Stack(cmd) => match cmd {

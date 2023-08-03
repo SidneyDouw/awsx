@@ -1,4 +1,4 @@
-use awsx::config::Options;
+use awsx::config_old::Options;
 use std::path::PathBuf;
 
 #[test]
@@ -43,7 +43,7 @@ fn get_project_root_with_invalid_path() {
 #[test]
 fn get_project_root_with_relative_path() {
     let options = Options {
-        project_root: Some("tests/fixtures/nested_configs".into()),
+        project_root: Some("tests/fixtures/config/nested".into()),
         ..Default::default()
     };
 
@@ -53,7 +53,7 @@ fn get_project_root_with_relative_path() {
 
     let r = options.get_project_root();
     match r {
-        Ok(path) => assert_eq!(path, root_dir.join("tests/fixtures/nested_configs")),
+        Ok(path) => assert_eq!(path, root_dir.join("tests/fixtures/config/nested")),
         Err(_) => unreachable!(),
     }
 }

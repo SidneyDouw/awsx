@@ -1,388 +1,157 @@
-use super::{Config, OVERRIDE_FILEPATH};
+use super::{tomlfile::traits::TomlFileGetters, Config, Error};
 use crate::cmd::read_with_dir_and_env;
 use convert_case::{Case, Casing};
-use core::panic;
 use std::{
+    cmp::Ordering,
     collections::HashMap,
     path::{Path, PathBuf},
 };
-use toml::{
-    value::{Datetime, Map},
-    Value,
-};
+use toml::Value;
 
-// Getters
 impl Config {
-    pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.sorted_filepaths()
-            .into_iter()
-            .find_map(|filepath| self.get_from_file(&key, filepath))
-    }
+    pub fn get_parameters(
+        &self,
+        key_mask: Option<&Vec<String>>,
+    ) -> Result<HashMap<String, String>, Error> {
+        let config_envs = Self::get_envs(self)?;
 
-    pub fn get_with_filepath(&self, key: impl AsRef<str>) -> Option<(&Value, PathBuf)> {
-        self.sorted_filepaths()
-            .into_iter()
-            .find_map(|filepath| self.get_from_file(&key, &filepath).map(|v| (v, filepath)))
-    }
+        let mut map = HashMap::new();
+        for path in self.sorted_filepaths().into_iter() {
+            let config = self.configs.get(path).expect("config exists");
 
-    pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
-        for filepath in self.sorted_filepaths() {
-            match self.get_from_file_mut(&key, &filepath) {
-                Some(_) => return self.get_from_file_mut(key.as_ref(), &filepath),
-                None => continue,
-            }
-        }
-        None
-    }
+            let mut parameters = config
+                .parameters()
+                .iter()
+                .map(|(k, v)| (k.to_owned(), Self::extract_value(v)))
+                .collect::<Vec<_>>();
 
-    pub fn get_mut_with_filepath(&mut self, key: impl AsRef<str>) -> Option<(&mut Value, PathBuf)> {
-        for filepath in self.sorted_filepaths() {
-            match self.get_from_file_mut(&key, &filepath) {
-                Some(_) => {
-                    return self
-                        .get_from_file_mut(key.as_ref(), &filepath)
-                        .map(|x| (x, filepath))
+            Self::sort_by_value_with_expression(&mut parameters);
+
+            for (k, v) in parameters.into_iter() {
+                if map.contains_key(&k) {
+                    continue;
                 }
-                None => continue,
+
+                if let Some(key_mask) = key_mask {
+                    if !key_mask.contains(&k) {
+                        continue;
+                    }
+                }
+
+                map.insert(
+                    k.to_owned(),
+                    Self::resolve_expression(v, path, &config_envs)?,
+                );
             }
         }
-        None
+
+        Ok(map)
     }
 
-    pub fn get_envs(&self) -> HashMap<String, String> {
-        let mut envs: HashMap<String, (String, PathBuf)> = HashMap::new();
+    pub fn get_envs(&self) -> Result<HashMap<String, String>, Error> {
+        let mut map = HashMap::new();
+        for path in self.sorted_filepaths().into_iter() {
+            let config = self.configs.get(path).expect("config exists");
 
-        envs.extend(
-            self.get_merged_tables("env")
-                .into_iter()
-                .map(|(k, (v, p))| match v {
-                    Value::String(s) => (k, (s, p)),
-                    x => panic!("value for {k} is not a string, found {:?}", x),
-                }),
+            // TODO: potential sorting issue when parameter expressions depend on envs or the other
+            // way around
+
+            let mut parameters = config
+                .parameters()
+                .iter()
+                .filter_map(|(k, v)| Self::extract_exposed_value(v).map(|v| (k.to_owned(), v)))
+                .collect::<Vec<_>>();
+
+            Self::sort_by_value_with_expression(&mut parameters);
+
+            for (k, v) in parameters.into_iter() {
+                if map.contains_key(&k) {
+                    continue;
+                }
+
+                let k = format!("AWSX_PARAMETER_{}", k.to_case(Case::UpperSnake));
+                map.insert(k, Self::resolve_expression(v, path, &map)?);
+            }
+
+            let mut envs = config
+                .envs()
+                .iter()
+                .map(|(k, v)| (k.to_owned(), Self::extract_value(v)))
+                .collect::<Vec<_>>();
+
+            Self::sort_by_value_with_expression(&mut envs);
+
+            for (k, v) in envs.into_iter() {
+                if map.contains_key(&k) {
+                    continue;
+                }
+
+                map.insert(k.to_owned(), Self::resolve_expression(v, path, &map)?);
+            }
+        }
+
+        Ok(map)
+    }
+
+    /// Checks if a given value is surrounded by `{{ ... }}`
+    /// If it is, it will run the inner expression via `bash -c ...` and return the value
+    fn resolve_expression(
+        v: String,
+        path: &Path,
+        envs: &HashMap<String, String>,
+    ) -> Result<String, Error> {
+        if v.starts_with("{{") && v.ends_with("}}") {
+            let exp = v[2..v.len() - 2].trim();
+            let workdir = path.parent().expect("has parent");
+
+            read_with_dir_and_env(exp, workdir, envs).map_err(Error::Expression)
+        } else {
+            Ok(v)
+        }
+    }
+
+    fn extract_exposed_value(v: &Value) -> Option<String> {
+        match v {
+            Value::String(_) => None,
+            Value::Table(t) => match (t.get("value"), t.get("expose")) {
+                (Some(Value::String(s)), Some(Value::Boolean(b))) if *b == true => {
+                    Some(s.to_owned())
+                }
+                (Some(Value::String(_)), _) => None,
+                (Some(_), _) => panic!("expected string value"),
+                (None, _) => panic!("no \"value\" entry found"),
+            },
+            _ => panic!("expected \"string\" or \"table\" value"),
+        }
+    }
+
+    fn extract_value(v: &Value) -> String {
+        match v {
+            Value::String(s) => s.to_owned(),
+            Value::Table(t) => match t.get("value") {
+                Some(Value::String(s)) => s.to_owned(),
+                Some(_) => panic!("expected string value"),
+                None => panic!("no \"value\" entry found"),
+            },
+            _ => panic!("expected \"string\" or \"table\" value"),
+        }
+    }
+
+    fn sort_by_value_with_expression(vec: &mut Vec<(String, String)>) {
+        vec.sort_by(
+            |(_, v_a), (_, v_b)| match (v_a.contains('$'), v_b.contains('$')) {
+                (true, false) => Ordering::Greater,
+                (false, true) => Ordering::Less,
+                _ => Ordering::Equal,
+            },
         );
-
-        envs.extend(
-            self.get_merged_tables("parameters")
-                .into_iter()
-                .filter_map(|(k, (v, p))| match v {
-                    Value::Table(t) => match (t.get("value"), t.get("expose")) {
-                        (Some(Value::String(s)), Some(Value::Boolean(e))) if e == &true => Some((
-                            format!("AWSX_PARAMETER_{}", k.to_case(Case::UpperSnake)),
-                            (s.to_owned(), p),
-                        )),
-                        _ => None,
-                    },
-                    _ => None,
-                }),
-        );
-
-        self.resolve_expression_values(&mut envs);
-
-        envs.into_iter().map(|(k, (v, _))| (k, v)).collect()
     }
 
-    fn resolve_expression_values(&self, envs: &mut HashMap<String, (String, PathBuf)>) {
-        let cleaned_envs = envs
-            .clone()
-            .into_iter()
-            .map(|(k, (v, _))| (k, v))
-            .collect::<HashMap<_, _>>();
-
-        for (key, (val, config_path)) in envs.clone().into_iter() {
-            if val.starts_with("{{") && val.ends_with("}}") {
-                let exp = val[2..val.len() - 2].trim();
-                let workdir = config_path.parent().expect("has parent");
-
-                let val = read_with_dir_and_env(exp, workdir, &cleaned_envs, self)
-                    .expect("valid expression");
-                envs.entry(key).and_modify(|(v, _)| *v = val);
-            }
-        }
-    }
-
-    pub(crate) fn get_merged_tables(
-        &self,
-        key: impl AsRef<str>,
-    ) -> HashMap<String, (Value, PathBuf)> {
-        self.sorted_filepaths()
-            .into_iter()
-            .rev()
-            .map(|filepath| {
-                self.get_from_file(&key, &filepath)
-                    .map(|v| {
-                        (
-                            v.as_table()
-                                .unwrap_or_else(|| panic!("key {} should be a table", key.as_ref()))
-                                .to_owned(),
-                            filepath,
-                        )
-                    })
-                    .unwrap_or_default()
-            })
-            .map(|(table, filepath)| {
-                table
-                    .into_iter()
-                    .map(|(key, val)| (key, (val, filepath.clone())))
-                    .collect::<HashMap<_, _>>()
-            })
-            .reduce(|mut accum, item| {
-                item.into_iter().for_each(|(k, v)| {
-                    accum.insert(k, v);
-                });
-                accum
-            })
-            .unwrap_or_default()
-    }
-
-    pub(crate) fn get_from_file(
-        &self,
-        key: impl AsRef<str>,
-        filepath: impl AsRef<Path>,
-    ) -> Option<&Value> {
-        let (key, sub_keys) = Self::split_key_once(key.as_ref());
-        let filepath = if filepath.as_ref().to_string_lossy() == OVERRIDE_FILEPATH {
-            filepath.as_ref().to_owned()
-        } else {
-            filepath.as_ref().canonicalize().ok()?
-        };
-        let val = self.file_map.get(&filepath)?.get(key)?;
-        match (sub_keys.is_empty(), val) {
-            (false, Value::Table(t)) => Self::get_from_table(t, sub_keys),
-            (true, _) => Some(val),
-            _ => None,
-        }
-    }
-
-    pub(crate) fn get_from_table(
-        table: &Map<String, Value>,
-        key: impl AsRef<str>,
-    ) -> Option<&Value> {
-        let (key, sub_keys) = Self::split_key_once(key.as_ref());
-        let val = table.get(key)?;
-        match (sub_keys.is_empty(), val) {
-            (false, Value::Table(t)) => Self::get_from_table(t, sub_keys),
-            (true, _) => Some(val),
-            _ => None,
-        }
-    }
-
-    pub(crate) fn get_from_file_mut(
-        &mut self,
-        key: impl AsRef<str>,
-        filepath: impl AsRef<Path>,
-    ) -> Option<&mut Value> {
-        let (key, sub_keys) = Self::split_key_once(key.as_ref());
-        let filepath = if filepath.as_ref().to_string_lossy() == OVERRIDE_FILEPATH {
-            filepath.as_ref().to_owned()
-        } else {
-            filepath.as_ref().canonicalize().ok()?
-        };
-        let val = self.file_map.get_mut(&filepath)?.get_mut(key)?;
-        if sub_keys.is_empty() {
-            Some(val)
-        } else {
-            match val {
-                Value::Table(t) => Self::get_from_table_mut(t, sub_keys),
-                _ => None,
-            }
-        }
-    }
-
-    pub(crate) fn get_from_table_mut(
-        table: &mut Map<String, Value>,
-        key: impl AsRef<str>,
-    ) -> Option<&mut Value> {
-        let (key, sub_keys) = Self::split_key_once(key.as_ref());
-        let val = table.get_mut(key)?;
-        if sub_keys.is_empty() {
-            Some(val)
-        } else {
-            match val {
-                Value::Table(t) => Self::get_from_table_mut(t, sub_keys),
-                _ => None,
-            }
-        }
-    }
-
-    pub(crate) fn get_root_table_mut(
-        &mut self,
-        filepath: impl AsRef<Path>,
-    ) -> &mut Map<String, Value> {
-        self.file_map
-            .entry(filepath.as_ref().to_owned())
-            .or_insert_with(|| Value::Table(Map::new()))
-            .as_table_mut()
-            .expect("there should always be a 'table' at the root")
-    }
-
-    pub(crate) fn split_key_once(key: &str) -> (&str, &str) {
-        match key.split_once('.') {
-            Some((key, sub_keys)) => (key, sub_keys),
-            None => (key, ""),
-        }
-    }
-
-    pub(crate) fn sorted_filepaths(&self) -> Vec<PathBuf> {
-        let mut filepaths = self
-            .file_map
-            .keys()
-            .map(ToOwned::to_owned)
-            .filter(|e| e.to_string_lossy() != OVERRIDE_FILEPATH)
-            .collect::<Vec<_>>();
+    /// returns a [Vec] of config paths, sorted from innermost to outermost
+    fn sorted_filepaths(&self) -> Vec<&PathBuf> {
+        let mut filepaths = self.configs.keys().collect::<Vec<_>>();
 
         filepaths.sort_by(|a, b| b.partial_cmp(a).unwrap());
-        filepaths.insert(0, PathBuf::from(OVERRIDE_FILEPATH));
-
         filepaths
-    }
-}
-
-/// Specific getters
-#[cfg(not(tarpaulin_include))]
-impl Config {
-    pub fn get_string(&self, key: impl AsRef<str>) -> Option<&String> {
-        match self.get(key) {
-            Some(Value::String(v)) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn get_int(&self, key: impl AsRef<str>) -> Option<&i64> {
-        match self.get(key) {
-            Some(Value::Integer(v)) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn get_float(&self, key: impl AsRef<str>) -> Option<&f64> {
-        match self.get(key) {
-            Some(Value::Float(v)) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn get_bool(&self, key: impl AsRef<str>) -> Option<&bool> {
-        match self.get(key) {
-            Some(Value::Boolean(v)) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn get_datetime(&self, key: impl AsRef<str>) -> Option<&Datetime> {
-        match self.get(key) {
-            Some(Value::Datetime(v)) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn get_array(&self, key: impl AsRef<str>) -> Option<&Vec<Value>> {
-        match self.get(key) {
-            Some(Value::Array(v)) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn get_table(&self, key: impl AsRef<str>) -> Option<&Map<String, Value>> {
-        match self.get(key) {
-            Some(Value::Table(v)) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn get_string_mut(&mut self, key: impl AsRef<str>) -> Option<&mut String> {
-        match self.get_mut(key) {
-            Some(Value::String(v)) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn get_int_mut(&mut self, key: impl AsRef<str>) -> Option<&mut i64> {
-        match self.get_mut(key) {
-            Some(Value::Integer(v)) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn get_float_mut(&mut self, key: impl AsRef<str>) -> Option<&mut f64> {
-        match self.get_mut(key) {
-            Some(Value::Float(v)) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn get_bool_mut(&mut self, key: impl AsRef<str>) -> Option<&mut bool> {
-        match self.get_mut(key) {
-            Some(Value::Boolean(v)) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn get_datetime_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Datetime> {
-        match self.get_mut(key) {
-            Some(Value::Datetime(v)) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn get_array_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Vec<Value>> {
-        match self.get_mut(key) {
-            Some(Value::Array(v)) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn get_table_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Map<String, Value>> {
-        match self.get_mut(key) {
-            Some(Value::Table(v)) => Some(v),
-            _ => None,
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::path::PathBuf;
-
-    #[test]
-    fn test_get_from_file() {
-        let path = PathBuf::from("tests/fixtures/nested_configs/config.toml");
-        let config = Config::from_path(&path, Default::default()).unwrap();
-
-        let v = config.get_from_file("non_existent", &path);
-        assert_eq!(v, None);
-
-        let v = config.get_from_file("var_a", &path.join("invalid"));
-        assert_eq!(v, None);
-
-        let v = config
-            .get_from_file("var_a", &path)
-            .unwrap()
-            .as_str()
-            .unwrap();
-        assert_eq!(v, "abc");
-
-        let v = config.get_from_file("env", &path).unwrap();
-        assert!(matches!(v, toml::Value::Table(_)));
-
-        let v = config
-            .get_from_file("env.AWS_PROFILE", &path)
-            .unwrap()
-            .as_str()
-            .unwrap();
-        assert_eq!(v, "default");
-
-        let v = config.get_from_file("sub.a", &path).unwrap();
-        assert!(matches!(v, toml::Value::Table(_)));
-
-        let v = config.get_from_file("sub.a.", &path).unwrap();
-        assert!(matches!(v, toml::Value::Table(_)));
-
-        let v = config
-            .get_from_file("sub.b.var_c", &path)
-            .unwrap()
-            .as_str()
-            .unwrap();
-        assert_eq!(v, "rst");
     }
 }

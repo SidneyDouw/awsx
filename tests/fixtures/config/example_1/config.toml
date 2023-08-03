@@ -1,0 +1,28 @@
+# This is the shared base configuration which will be used for cloud formation and other tools or scripts.
+# Config files which are placed in subfolders to this folder (i.e. ./sandbox/config.toml) will extend this configuration.
+
+# Parameters are variables that will be passed to a cloudformation template when run via awsx, i.e.
+# `awsx --config some_config.toml stack create --template some_template.yml some_stack_name`.
+# If a parameter has the `expose = true` property it will also be exposed as an environment variable
+# with the `AWSX_PARAMETER_` prefix, so the parameter ProjectName becomes AWSX_PARAMETER_PROJECT_NAME.
+[parameters]
+# The main project name / prefix - will propagate into many different parts of the application.
+ProjectName = { value = "vodaverse", expose = true }
+# The name of the S3 bucket which will hold the files for unity and frontend builds.
+# The bucket will not be destroyed if the stack is destroyed, meaning the stack can be started and stopped without losing any data.
+BucketName = { value = "{{ echo $AWSX_PARAMETER_PROJECT_NAME-builds }}", expose = true }
+
+# Envs simply are variables that will be exposed to the environment in the awsx command / process that
+# utilizes this config file.
+[envs]
+# What profile and region should the `aws cli` use.
+AWS_PROFILE = "magig"
+AWS_DEFAULT_REGION = "eu-central-1"
+
+# Various Cloud Formation stack names.
+INFRASTRUCTURE_STACK_NAME = "{{ echo $AWSX_PARAMETER_PROJECT_NAME }}"
+CERTIFICATE_STACK_NAME = "{{ echo $AWSX_PARAMETER_PROJECT_NAME-certificates }}"
+RENDERINSTANCE_STACK_NAME = "{{ echo $AWSX_PARAMETER_PROJECT_NAME-renderinstance-setup }}"
+MULTIPLAYER_SERVER_STACK_NAME = "{{ echo $AWSX_PARAMETER_PROJECT_NAME-multiplayer-server-setup }}"
+COTURN_SERVER_STACK_NAME = "{{ echo $AWSX_PARAMETER_PROJECT_NAME-coturn-server-setup }}"
+SANDBOX_STACK_NAME = "{{ echo $AWSX_PARAMETER_PROJECT_NAME-sandbox }}"

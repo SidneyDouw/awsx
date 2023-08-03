@@ -1,6 +1,8 @@
-use crate::{cmd::read_with_dir, config::Config};
-use std::path::{Path, PathBuf};
-use toml::Value;
+use crate::config::Config;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 use yaml_rust::{Yaml, YamlLoader};
 
 #[derive(Debug, thiserror::Error)]
@@ -22,16 +24,14 @@ pub enum Error {
     Cmd(#[from] crate::cmd::Error),
 }
 
-pub fn parameters_to_string(parameters: Vec<(String, Value)>) -> String {
+pub fn parameters_to_cmd_string(parameters: HashMap<String, String>) -> String {
     [String::from("--parameters")]
         .into_iter()
-        .chain(parameters.into_iter().map(|(k, v)| match v {
-            Value::Table(t) => match t.get("value") {
-                Some(v) => format!("ParameterKey={},ParameterValue={}", k, v),
-                None => panic!("missing 'value' key in table: {k} - {:?}", t),
-            },
-            _ => format!("ParameterKey={},ParameterValue={}", k, v),
-        }))
+        .chain(
+            parameters
+                .into_iter()
+                .map(|(k, v)| format!("ParameterKey={},ParameterValue={}", k, v)),
+        )
         .collect::<Vec<String>>()
         .join(" ")
 }
@@ -40,42 +40,23 @@ pub fn parameters_to_string(parameters: Vec<(String, Value)>) -> String {
 pub fn get_parameter_values_from_config(
     template: impl AsRef<Path>,
     config: &Config,
-) -> Result<Vec<(String, Value)>, Error> {
-    extract_parameter_keys_from_template(template)?
-        .into_iter()
-        .map(|key| {
-            config
-                .get_with_filepath(&format!("parameters.{}", key))
-                .map(|(val, filepath)| (key.clone(), val.clone(), filepath))
-                .ok_or(Error::MissingParameter { key })
-        })
-        .flat_map(|r| {
-            r.map(|(key, val, filepath)| {
-                let val = match val {
-                    Value::Table(t) => match t.get("value") {
-                        Some(v) => v.to_owned(),
-                        None => panic!("missing 'value' key in table: {key} - {:?}", t),
-                    },
-                    _ => val,
-                };
+) -> Result<HashMap<String, String>, Error> {
+    let key_mask = extract_parameter_keys_from_template(template)?;
+    let parameters = config
+        .get_parameters(Some(&key_mask))
+        .map_err(|e| match e {
+            crate::config::Error::Expression(e) => e,
+        })?;
 
-                if let Some(s) = val.as_str() {
-                    if s.starts_with("{{") && s.ends_with("}}") {
-                        let exp = s[2..s.len() - 2].trim();
-                        return read_with_dir(
-                            exp,
-                            filepath.parent().expect("has a parent"),
-                            config,
-                        )
-                        .map(|val| (key, Value::String(val)))
-                        .map_err(Error::Cmd);
-                    }
-                }
+    for key in key_mask.iter() {
+        if !parameters.contains_key(key) {
+            return Err(Error::MissingParameter {
+                key: key.to_owned(),
+            });
+        }
+    }
 
-                Ok((key, val))
-            })
-        })
-        .collect::<Result<Vec<_>, Error>>()
+    Ok(parameters)
 }
 
 pub fn extract_parameter_keys_from_template(

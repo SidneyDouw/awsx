@@ -176,8 +176,9 @@ pub fn get_latest_ami(filter: Option<String>, with_name: bool, config: &Config) 
 
             match &filter {
                 Some(filter) => {
+                    // ...because filter could be an env_var that maps to an ami name
                     if let Some(filter) = filter.strip_prefix('$') {
-                        let envs = config.get_envs();
+                        let envs = config.get_envs().expect("valid expression");
                         let var = envs.get(filter)?;
                         name.contains(var).then_some(out)
                     } else {

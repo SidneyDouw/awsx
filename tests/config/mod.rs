@@ -1,11 +1,11 @@
 use crate::tools::fixture_path;
-use awsx::config::{Config, Options};
+use awsx::config_old::{Config, Options};
 
 mod options;
 
 #[test]
 fn get_exact_config_values() {
-    let path = fixture_path("nested_configs/config.toml");
+    let path = fixture_path("config/nested/config.toml");
     let config = Config::from_path(path, Default::default()).unwrap();
 
     assert_eq!(config.get("non_existent"), None);
@@ -29,7 +29,7 @@ fn get_exact_config_values() {
 
 #[test]
 fn mody_config_values() {
-    let path = fixture_path("nested_configs/config.toml");
+    let path = fixture_path("config/nested/config.toml");
     let mut config = Config::from_path(path, Default::default()).unwrap();
 
     assert_eq!(config.get_mut("non_existent"), None);
@@ -55,14 +55,14 @@ fn mody_config_values() {
 
 #[test]
 fn load_outer_config() {
-    let path = fixture_path("nested_configs/config.toml");
+    let path = fixture_path("config/nested/config.toml");
     let config = Config::from_path(path, Default::default()).unwrap();
 
     assert_eq!(config.get("non_existent"), None);
 
-    assert_eq!(unpack_str(config.get("env.AWS_PROFILE")), Some("default"));
+    assert_eq!(unpack_str(config.get("envs.AWS_PROFILE")), Some("default"));
     assert_eq!(
-        unpack_str(config.get("env.AWS_DEFAULT_REGION")),
+        unpack_str(config.get("envs.AWS_DEFAULT_REGION")),
         Some("eu-central-1")
     );
 
@@ -82,7 +82,7 @@ fn load_outer_config() {
 
 #[test]
 fn load_inner_config() {
-    let path = fixture_path("nested_configs/sub/config.toml");
+    let path = fixture_path("config/nested/sub/config.toml");
     let options = Options {
         nested: false,
         ..Default::default()
@@ -91,7 +91,7 @@ fn load_inner_config() {
 
     assert_eq!(config.get("non_existent"), None);
 
-    assert_eq!(unpack_str(config.get("env.AWS_PROFILE")), Some("edited"));
+    assert_eq!(unpack_str(config.get("envs.AWS_PROFILE")), Some("edited"));
     assert_eq!(unpack_str(config.get("var_a")), Some("cba"));
     assert_eq!(unpack_str(config.get("sub.b.var_c")), Some("sph"));
 
@@ -102,14 +102,14 @@ fn load_inner_config() {
 
 #[test]
 fn load_nested_configs() {
-    let path = fixture_path("nested_configs/sub/config.toml");
+    let path = fixture_path("config/nested/sub/config.toml");
     let config = Config::from_path(path, Default::default()).unwrap();
 
     assert_eq!(config.get("non_existent"), None);
 
-    assert_eq!(unpack_str(config.get("env.AWS_PROFILE")), Some("edited"));
+    assert_eq!(unpack_str(config.get("envs.AWS_PROFILE")), Some("edited"));
     assert_eq!(
-        unpack_str(config.get("env.AWS_DEFAULT_REGION")),
+        unpack_str(config.get("envs.AWS_DEFAULT_REGION")),
         Some("eu-central-1")
     );
 
@@ -129,7 +129,7 @@ fn load_nested_configs() {
 
 #[test]
 fn load_nested_configs_with_overrides() {
-    let path = fixture_path("nested_configs/sub/config.toml");
+    let path = fixture_path("config/nested/sub/config.toml");
     let mut config = Config::from_path(path, Default::default()).unwrap();
 
     config.set_string("var_b", "bbb");
@@ -145,9 +145,9 @@ fn load_nested_configs_with_overrides() {
 
     assert_eq!(unpack_str(config.get("dynamic")), Some("test"));
 
-    assert_eq!(unpack_str(config.get("env.AWS_PROFILE")), Some("edited"));
+    assert_eq!(unpack_str(config.get("envs.AWS_PROFILE")), Some("edited"));
     assert_eq!(
-        unpack_str(config.get("env.AWS_DEFAULT_REGION")),
+        unpack_str(config.get("envs.AWS_DEFAULT_REGION")),
         Some("eu-central-1")
     );
 

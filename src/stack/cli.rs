@@ -1,4 +1,4 @@
-use super::util::{get_parameter_values_from_config, parameters_to_string};
+use super::util::{get_parameter_values_from_config, parameters_to_cmd_string};
 use crate::{
     cmd::{read, run},
     config::Config,
@@ -13,7 +13,7 @@ pub fn create(
 ) -> Result<()> {
     // TODO: Can we deduplicate some code here regarding the expression evaluation in the config parameters?
     // This work is already being done inside the `run` function
-    let parameters = parameters_to_string(get_parameter_values_from_config(&template, config)?);
+    let parameters = parameters_to_cmd_string(get_parameter_values_from_config(&template, config)?);
 
     let cmd = format!(
             "aws cloudformation create-stack --stack-name {} --template-body file://{} --capabilities CAPABILITY_NAMED_IAM {}",
@@ -42,9 +42,7 @@ pub fn update(
     template: impl AsRef<Path>,
     config: &Config,
 ) -> Result<()> {
-    // TODO: Can we deduplicate some code here regarding the expression evaluation in the config parameters?
-    // This work is already being done inside the `run` function
-    let parameters = parameters_to_string(get_parameter_values_from_config(&template, config)?);
+    let parameters = parameters_to_cmd_string(get_parameter_values_from_config(&template, config)?);
 
     let cmd = format!(
             "aws cloudformation update-stack --stack-name {} --template-body file://{} --capabilities CAPABILITY_NAMED_IAM {}",
