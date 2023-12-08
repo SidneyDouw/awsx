@@ -40,6 +40,9 @@ pub enum Subcommands {
 
     #[clap(subcommand)]
     Route53(awsx::route53::Subcommands),
+
+    #[clap(subcommand)]
+    Secrets(awsx::secrets::Subcommands),
 }
 
 #[cfg(not(tarpaulin_include))]
@@ -127,6 +130,9 @@ fn main() -> anyhow::Result<()> {
             awsx::route53::Subcommands::HostedZoneId { hosted_zone_name } => {
                 awsx::route53::hosted_zone_id(hosted_zone_name, &config)
             }
+        },
+        Subcommands::Secrets(cmd) => match cmd {
+            awsx::secrets::Subcommands::Get { name, key } => awsx::secrets::get(name, key, &config),
         },
     }?;
 

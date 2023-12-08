@@ -5,4 +5,5 @@ pub mod ec2;
 pub mod env;
 pub mod lambda;
 pub mod route53;
+pub mod secrets;
 pub mod stack;
