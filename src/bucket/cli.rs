@@ -57,3 +57,19 @@ pub fn rm(path: impl AsRef<str>, recursive: bool, config: &Config) -> Result<()>
 
     Ok(())
 }
+
+pub fn upload(path: impl AsRef<str>, to: impl AsRef<str>, config: &Config) -> Result<()> {
+    let timestamp = read("date +\"%Y-%m-%d_%H:%M:%S\"", &config)?;
+    let to = to.as_ref().trim_end_matches('/');
+
+    cp(path, format!("{to}/{timestamp}/"), true, config)?;
+    rm(format!("{to}/latest/",), true, config)?;
+    cp(
+        format!("{to}/{timestamp}/"),
+        format!("{to}/latest/"),
+        true,
+        config,
+    )?;
+
+    Ok(())
+}

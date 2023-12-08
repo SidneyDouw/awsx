@@ -117,6 +117,9 @@ fn main() -> anyhow::Result<()> {
                 bucket_name,
                 policy,
             } => awsx::bucket::put_bucket_policy(&bucket_name, &policy, &config),
+            awsx::bucket::Subcommands::Upload { path, to } => {
+                awsx::bucket::upload(path, to, &config)
+            }
         },
 
         Subcommands::Lambda(cmd) => match cmd {

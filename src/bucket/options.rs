@@ -21,4 +21,7 @@ pub enum Subcommands {
 
     /// Adds a bucket policy to the specified bucket
     PutBucketPolicy { bucket_name: String, policy: String },
+
+    /// Upload and replace
+    Upload { path: String, to: String },
 }
