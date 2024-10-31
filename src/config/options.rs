@@ -33,6 +33,12 @@ impl Options {
                         break path;
                     }
                 }
+                if path.parent().is_none() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "could not find project root",
+                    ));
+                }
                 path.pop();
             };
 
